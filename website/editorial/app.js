@@ -1,157 +1,233 @@
-// Routing, views, intro and cursor for the editorial site.
-// Routes: #/ (index), #/info, #/thumbnails, #/works/<id>/<n>.
+// Routes: #/ (index), #/serie/<id>/<n>, #/grille, #/studio, #/contact.
 
 (() => {
-  const works = window.REA_WORKS;
-  const byId = Object.fromEntries(works.map((w) => [w.id, w]));
+  const S = window.SERIES;
+  const STUDIO = window.STUDIO;
+  const byId = Object.fromEntries(S.map((s) => [s.id, s]));
   const body = document.body;
-  const stage = document.getElementById("stage");
-  const thumbs = document.getElementById("thumbs");
-  const list = document.getElementById("works-list");
-  const cursor = document.getElementById("cursor");
-  const cursorLabel = cursor.querySelector(".label");
+  const view = document.getElementById("view");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const finePointer = matchMedia("(hover: hover) and (pointer: fine)").matches;
 
-  const name = (w) => `${w.title} — ${w.subtitle}`;
-  const pad = (n) => String(n);
+  // Language ------------------------------------------------------------
 
-  const printEl = (plate, opts) => {
-    const el = document.createElement("div");
-    el.className = "print";
-    el.style.setProperty("--r", plate.r);
-    el.style.setProperty("--plate-bg", plate.pal.bg);
-    el.innerHTML = window.renderPlate(plate, opts);
-    return el;
+  const STR = {
+    fr: {
+      "nav.work": "Travaux", "nav.studio": "Studio", "nav.contact": "Contact",
+      "view.index": "Index", "view.grid": "Grille", "clock.city": "Paris",
+      view: "Voir la série", close: "Fermer", photo: "Photo : Pexels",
+      "cat.all": "Tout", "cat.editorial": "Éditorial", "cat.campaign": "Campagne", "cat.portrait": "Portrait",
+      client: "Client", photography: "Photographie", styling: "Stylisme", hair: "Coiffure",
+      makeup: "Maquillage", casting: "Casting", place: "Lieu", year: "Année",
+      manifesto: "Nous photographions la mode comme on écrit une lettre : lentement, à la lumière du jour, avec le goût du détail.",
+      "b.studio": "Le studio",
+      "b.studio.1": "Fondée à Paris, Maison Vérane réunit photographes, stylistes et producteurs autour d'une même idée : des images calmes, précises et durables.",
+      "b.studio.2": "Notre studio du 11e arrondissement offre 180 m² de lumière naturelle, des fonds peints à la main et un espace de production complet.",
+      "b.services": "Services",
+      services: ["Éditorial", "Campagne", "Lookbook", "Portrait", "Direction artistique", "Production"],
+      "b.approach": "Approche",
+      "b.approach.1": "Chaque projet commence par un repérage et une planche d'intentions partagée. Nous travaillons en argentique comme en numérique, en studio comme en extérieur, en France et à l'étranger.",
+      "b.clients": "Clients",
+      "studio.caption": "Le studio, Paris 11e",
+      "c.write": "Écrire au studio", "c.studio": "Studio", "c.agent": "Agent",
+      fine: "Noms, clients et coordonnées fictifs, à remplacer. Photographies issues de",
+      title: "Maison Vérane — Studio de photographie, Paris",
+    },
+    en: {
+      "nav.work": "Work", "nav.studio": "Studio", "nav.contact": "Contact",
+      "view.index": "Index", "view.grid": "Grid", "clock.city": "Paris",
+      view: "View series", close: "Close", photo: "Photo: Pexels",
+      "cat.all": "All", "cat.editorial": "Editorial", "cat.campaign": "Campaign", "cat.portrait": "Portrait",
+      client: "Client", photography: "Photography", styling: "Styling", hair: "Hair",
+      makeup: "Make-up", casting: "Casting", place: "Location", year: "Year",
+      manifesto: "We photograph fashion the way one writes a letter: slowly, in daylight, with a taste for detail.",
+      "b.studio": "The studio",
+      "b.studio.1": "Founded in Paris, Maison Vérane brings photographers, stylists and producers together around one idea: calm, precise, lasting images.",
+      "b.studio.2": "Our studio in the 11th arrondissement offers 180 m² of daylight, hand-painted backdrops and a full production space.",
+      "b.services": "Services",
+      services: ["Editorial", "Campaign", "Lookbook", "Portrait", "Art direction", "Production"],
+      "b.approach": "Approach",
+      "b.approach.1": "Every project begins with a location scout and a shared mood board. We shoot on film and digital, in the studio and on location, in France and abroad.",
+      "b.clients": "Clients",
+      "studio.caption": "The studio, Paris 11th",
+      "c.write": "Write to the studio", "c.studio": "Studio", "c.agent": "Agent",
+      fine: "Names, clients and contact details are placeholders. Photographs from",
+      title: "Maison Vérane — Photography studio, Paris",
+    },
   };
 
-  // Works list ------------------------------------------------------------
+  let lang = "fr";
+  try {
+    const saved = localStorage.getItem("mv-lang");
+    if (saved === "fr" || saved === "en") lang = saved;
+  } catch {}
 
-  list.innerHTML = works
-    .map(
-      (w) =>
-        `<li><a href="#/works/${w.id}/1" data-id="${w.id}">` +
-        `<span class="name">${name(w)}</span>` +
-        (w.tag ? `<span class="tag">${w.tag}</span>` : "") +
-        `<span class="count">${w.plates.length}</span></a></li>`,
-    )
-    .join("");
+  const t = (k) => STR[lang][k] ?? k;
+  const L = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v[lang] : v);
+  const esc = (s) =>
+    String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const pad2 = (n) => String(n).padStart(2, "0");
 
-  let hoverId = null;
-  list.addEventListener("pointerover", (e) => {
-    const a = e.target.closest("a[data-id]");
-    if (!a || a.dataset.id === hoverId || route().view !== "index") return;
-    hoverId = a.dataset.id;
-    showFeatured(byId[hoverId]);
-  });
-  list.addEventListener("pointerleave", () => {
-    hoverId = null;
-  });
-
-  // Photo credits, generated from the plates that carry one.
-  const credited = works.flatMap((w) => w.plates.filter((p) => p.credit));
-  document.getElementById("credits").innerHTML =
-    `Photographs from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a>: ` +
-    credited
-      .map((p, i) => `<a href="${p.credit}" target="_blank" rel="noopener" title="${p.alt}">${i + 1}</a>`)
-      .join(", ") +
-    ".";
-
-  // Panel tabs ------------------------------------------------------------
-
-  const setTab = (tab) => {
-    document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("is-active", b.dataset.tab === tab));
-    document.querySelectorAll("[data-pane]").forEach((p) => (p.hidden = p.dataset.pane !== tab));
+  const applyLang = () => {
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-i18n]").forEach((el) => (el.textContent = t(el.dataset.i18n)));
+    document.querySelectorAll("[data-lang]").forEach((b) => b.classList.toggle("is-active", b.dataset.lang === lang));
   };
-  document.querySelectorAll("[data-tab]").forEach((b) =>
+
+  document.querySelectorAll("[data-lang]").forEach((b) =>
     b.addEventListener("click", () => {
-      location.hash = b.dataset.tab === "info" ? "#/info" : "#/";
+      lang = b.dataset.lang;
+      try {
+        localStorage.setItem("mv-lang", lang);
+      } catch {}
+      applyLang();
+      render(true);
     }),
   );
-  document.querySelector(".panel-close").addEventListener("click", () => body.classList.remove("panel-open"));
 
-  document.querySelector("[data-copy]").addEventListener("click", async (e) => {
-    const btn = e.currentTarget;
-    const state = btn.querySelector(".cmd-state");
-    try {
-      await navigator.clipboard.writeText(btn.dataset.copy);
-      state.textContent = "Copied";
-    } catch {
-      state.textContent = "Select and copy";
-    }
-    setTimeout(() => (state.textContent = "Copy"), 1600);
-  });
+  // Paris clock ---------------------------------------------------------
 
-  // Index view: one featured print that follows the list ------------------
+  const clock = document.getElementById("clock");
+  const fmt = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" });
+  const tick = () => (clock.textContent = fmt.format(new Date()));
+  tick();
+  setInterval(tick, 15000);
 
-  let featuredId = null;
+  // Index ---------------------------------------------------------------
+
   let cycle = null;
+  let currentId = S[0].id;
 
-  const showFeatured = (w) => {
-    if (featuredId === w.id) return;
-    featuredId = w.id;
-    const inner = document.createElement("div");
-    inner.className = "stage-inner";
-    const a = document.createElement("a");
-    a.href = `#/works/${w.id}/1`;
-    a.dataset.cursor = `${name(w)} — View`;
-    a.setAttribute("aria-label", `Open ${name(w)}`);
-    a.appendChild(printEl(w.plates[0], { eager: true }));
-    inner.appendChild(a);
-    stage.replaceChildren(inner);
-    list.querySelectorAll("a").forEach((x) => x.classList.toggle("is-current", x.dataset.id === w.id));
+  const renderIndex = () => {
+    view.innerHTML =
+      `<section class="view index">` +
+      `<ol class="series-list">` +
+      S.map(
+        (s, i) =>
+          `<li><a href="#/serie/${s.id}/1" data-id="${s.id}">` +
+          `<span class="num meta">${pad2(i + 1)}</span>` +
+          `<span class="title">${esc(s.title)}</span>` +
+          `<span class="info meta">${esc(t("cat." + s.cat))} — ${s.year}</span></a></li>`,
+      ).join("") +
+      `</ol>` +
+      `<div class="feature">` +
+      `<a class="feature-frame" href="#/serie/${currentId}/1">` +
+      S.map((s) => `<img src="${s.photos[0].src}" alt="${esc(s.photos[0].alt)}" data-id="${s.id}" />`).join("") +
+      `</a>` +
+      `<div class="feature-caption meta"><span class="cap-title"></span><span class="cap-count muted"></span></div>` +
+      `</div></section>`;
+
+    const frame = view.querySelector(".feature-frame");
+    const list = view.querySelector(".series-list");
+
+    const show = (id) => {
+      currentId = id;
+      const s = byId[id];
+      frame.href = `#/serie/${id}/1`;
+      frame.dataset.cursor = `${s.title} — ${t("view")}`;
+      frame.querySelectorAll("img").forEach((img) => img.classList.toggle("is-shown", img.dataset.id === id));
+      list.querySelectorAll("a").forEach((a) => a.classList.toggle("is-current", a.dataset.id === id));
+      view.querySelector(".cap-title").textContent = `${L(s.client)} — ${L(s.place)}`;
+      view.querySelector(".cap-count").textContent = `${pad2(S.indexOf(s) + 1)} / ${pad2(S.length)}`;
+      refreshCursor();
+    };
+
+    let hovering = false;
+    list.addEventListener("pointerover", (e) => {
+      const a = e.target.closest("a[data-id]");
+      if (!a) return;
+      hovering = true;
+      if (a.dataset.id !== currentId) show(a.dataset.id);
+    });
+    list.addEventListener("pointerleave", () => (hovering = false));
+    list.addEventListener("focusin", (e) => {
+      const a = e.target.closest("a[data-id]");
+      if (a) show(a.dataset.id);
+    });
+
+    show(currentId);
+    if (!reduced)
+      cycle = setInterval(() => {
+        if (hovering) return;
+        const i = S.findIndex((s) => s.id === currentId);
+        show(S[(i + 1) % S.length].id);
+      }, 4800);
   };
 
-  const startCycle = () => {
-    stopCycle();
-    if (reduced) return;
-    cycle = setInterval(() => {
-      if (hoverId) return;
-      const i = works.findIndex((w) => w.id === featuredId);
-      showFeatured(works[(i + 1) % works.length]);
-    }, 4200);
-  };
-  const stopCycle = () => clearInterval(cycle);
-
-  // Work view: one plate at a time, click halves to step ------------------
+  // Series viewer -------------------------------------------------------
 
   let viewing = null;
 
-  const showWork = (w, n) => {
-    const total = w.plates.length;
+  const renderSeries = (s, n) => {
+    const total = s.photos.length;
     n = ((n - 1 + total) % total) + 1;
-    viewing = { w, n, total };
-    featuredId = null;
-    const inner = document.createElement("div");
-    inner.className = "stage-inner";
-    const print = printEl(w.plates[n - 1], { eager: true });
-    const zones = document.createElement("div");
-    zones.className = "zones";
-    zones.innerHTML =
-      `<a href="#/works/${w.id}/${n === 1 ? total : n - 1}" data-cursor="‹ ${name(w)} — ${n}/${total}" aria-label="Previous"></a>` +
-      `<a href="#/works/${w.id}/${n === total ? 1 : n + 1}" data-cursor="${name(w)} — ${n}/${total} ›" aria-label="Next"></a>`;
-    print.appendChild(zones);
-    const alt = w.plates[n - 1].alt;
-    if (alt) print.setAttribute("aria-label", alt);
-    const cap = document.createElement("p");
-    cap.className = "caption";
-    cap.innerHTML =
-      (n === 1 ? `${w.text} ` : `${name(w)}, ${w.kind}. `) +
-      `<a href="${w.href}" target="_blank" rel="noopener">Read the investigation</a>` +
-      (w.plates[n - 1].credit
-        ? ` · <a href="${w.plates[n - 1].credit}" target="_blank" rel="noopener">Photo: Pexels</a>`
-        : "");
-    inner.append(print, cap);
-    stage.replaceChildren(inner);
-    document.title = `${name(w)} — REA`;
+    viewing = { s, n, total };
+    const p = s.photos[n - 1];
+    const prev = n === 1 ? total : n - 1;
+    const next = n === total ? 1 : n + 1;
+    const crew = [
+      ["client", L(s.client)],
+      ["photography", STUDIO.name],
+      ["styling", s.crew.styling],
+      ["hair", s.crew.hair],
+      ["makeup", s.crew.makeup],
+      ["casting", s.crew.casting],
+      ["place", L(s.place)],
+      ["year", s.year],
+    ];
+    view.innerHTML =
+      `<section class="view series">` +
+      `<div class="series-info">` +
+      `<p class="meta muted">${esc(t("cat." + s.cat))} — ${pad2(n)} / ${pad2(total)}</p>` +
+      `<h1>${esc(s.title)}</h1>` +
+      `<p class="lede">${esc(L(s.text))}</p>` +
+      `<dl class="credits">${crew.map(([k, v]) => `<dt>${esc(t(k))}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +
+      `<p class="meta muted" style="margin-top:22px"><a href="${p.credit}" target="_blank" rel="noopener">${esc(t("photo"))}</a></p>` +
+      `</div>` +
+      `<div class="series-stage">` +
+      `<img src="${p.src}" alt="${esc(p.alt)}" />` +
+      `<div class="zones">` +
+      `<a href="#/serie/${s.id}/${prev}" aria-label="Précédente" data-cursor="‹ ${esc(s.title)} — ${n}/${total}"></a>` +
+      `<a href="#/serie/${s.id}/${next}" aria-label="Suivante" data-cursor="${esc(s.title)} — ${n}/${total} ›"></a>` +
+      `</div></div>` +
+      `<nav class="rail" aria-label="Images">` +
+      s.photos
+        .map(
+          (q, i) =>
+            `<a href="#/serie/${s.id}/${i + 1}" class="${i + 1 === n ? "is-current" : ""}" data-cursor="${i + 1}/${total}"><img src="${q.src}" alt="" loading="lazy" /></a>`,
+        )
+        .join("") +
+      `</nav>` +
+      `</section>` +
+      `<a class="series-close meta" href="#/" data-cursor="${esc(t("close"))}">${esc(t("close"))} ×</a>`;
+    document.title = `${s.title} — ${STUDIO.name}`;
+    // Warm the next photograph so stepping feels instant.
+    new Image().src = s.photos[next - 1].src;
   };
 
-  // Thumbnails ------------------------------------------------------------
+  // Grid ----------------------------------------------------------------
 
-  let thumbsBuilt = false;
-  const buildThumbs = () => {
-    if (thumbsBuilt) return;
-    thumbsBuilt = true;
+  let filter = "all";
+
+  const renderGrid = () => {
+    const cats = ["all", "editorial", "campaign", "portrait"];
+    view.innerHTML =
+      `<section class="view grid-view">` +
+      `<nav class="filters">${cats
+        .map((c) => `<button type="button" data-cat="${c}" class="${c === filter ? "is-active" : ""}">${esc(t("cat." + c))}</button>`)
+        .join("")}</nav>` +
+      `<div class="masonry">` +
+      S.flatMap((s) =>
+        s.photos.map(
+          (p, i) =>
+            `<a class="tile" href="#/serie/${s.id}/${i + 1}" data-cat="${s.cat}" data-cursor="${esc(s.title)} — ${i + 1}/${s.photos.length}">` +
+            `<div class="ph" style="aspect-ratio:${p.r}"><img src="${p.src}" alt="${esc(p.alt)}" loading="lazy" decoding="async" /></div>` +
+            `<div class="meta"><span>${esc(s.title)}</span><span>${pad2(i + 1)}</span></div></a>`,
+        ),
+      ).join("") +
+      `</div></section>`;
+
+    const tiles = [...view.querySelectorAll(".tile")];
     const io = new IntersectionObserver(
       (entries) =>
         entries.forEach((e) => {
@@ -159,90 +235,128 @@
           e.target.classList.add("is-in");
           io.unobserve(e.target);
         }),
-      { rootMargin: "0px 0px -6% 0px" },
+      { rootMargin: "0px 0px -5% 0px" },
     );
-    works.forEach((w) =>
-      w.plates.forEach((p, i) => {
-        const a = document.createElement("a");
-        a.className = "thumb";
-        a.href = `#/works/${w.id}/${i + 1}`;
-        a.dataset.cursor = `${name(w)} — ${i + 1}/${w.plates.length}`;
-        a.appendChild(printEl(p));
-        const meta = document.createElement("div");
-        meta.className = "meta";
-        meta.innerHTML = `<span>${name(w)}</span><span>${i + 1}/${w.plates.length}</span>`;
-        a.appendChild(meta);
-        thumbs.appendChild(a);
-        io.observe(a);
-      }),
-    );
+    const applyFilter = () => {
+      tiles.forEach((el) => (el.hidden = filter !== "all" && el.dataset.cat !== filter));
+      view.querySelectorAll("[data-cat]").forEach((b) => b.tagName === "BUTTON" && b.classList.toggle("is-active", b.dataset.cat === filter));
+    };
+    view.querySelector(".filters").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-cat]");
+      if (!b) return;
+      filter = b.dataset.cat;
+      applyFilter();
+    });
+    tiles.forEach((el) => io.observe(el));
+    applyFilter();
   };
 
-  // Router ----------------------------------------------------------------
+  // Studio --------------------------------------------------------------
+
+  const renderStudio = () => {
+    const p = byId["atelier"].photos[0];
+    view.innerHTML =
+      `<section class="view studio">` +
+      `<figure class="studio-photo" style="margin:0"><img src="${p.src}" alt="${esc(p.alt)}" />` +
+      `<figcaption class="meta muted">${esc(t("studio.caption"))}</figcaption></figure>` +
+      `<div>` +
+      `<p class="manifesto">${esc(t("manifesto"))}</p>` +
+      `<div class="block"><h2>${esc(t("b.studio"))}</h2><div><p>${esc(t("b.studio.1"))}</p><p>${esc(t("b.studio.2"))}</p></div></div>` +
+      `<div class="block"><h2>${esc(t("b.services"))}</h2><ul>${t("services").map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` +
+      `<div class="block"><h2>${esc(t("b.approach"))}</h2><div><p>${esc(t("b.approach.1"))}</p></div></div>` +
+      `<div class="block"><h2>${esc(t("b.clients"))}</h2><ul>${STUDIO.clients.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` +
+      `</div></section>`;
+  };
+
+  // Contact -------------------------------------------------------------
+
+  const tel = (n) => `tel:${n.replace(/[^+\d]/g, "")}`;
+
+  const renderContact = () => {
+    view.innerHTML =
+      `<section class="view contact">` +
+      `<div class="contact-hero"><span class="label-sans">${esc(t("c.write"))}</span>` +
+      `<a href="mailto:${STUDIO.email}" data-cursor="${esc(t("c.write"))}">${esc(STUDIO.email)}</a></div>` +
+      `<div class="contact-grid">` +
+      `<div><h2>${esc(t("c.studio"))}</h2><p>${STUDIO.address.map(esc).join("<br />")}</p>` +
+      `<p style="margin-top:12px"><a href="${tel(STUDIO.phone)}">${esc(STUDIO.phone)}</a><br />${esc(STUDIO.instagram)}</p></div>` +
+      STUDIO.agents
+        .map(
+          (a) =>
+            `<div><h2>${esc(t("c.agent"))} — ${esc(L(a.city))}</h2><p>${esc(a.name)}<br />` +
+            `<a href="mailto:${a.email}">${esc(a.email)}</a><br /><a href="${tel(a.phone)}">${esc(a.phone)}</a></p></div>`,
+        )
+        .join("") +
+      `</div>` +
+      `<p class="fine">${esc(t("fine"))} <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a>.</p>` +
+      `</section>`;
+  };
+
+  // Router --------------------------------------------------------------
 
   const route = () => {
-    const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
-    if (parts[0] === "thumbnails") return { view: "thumbnails" };
-    if (parts[0] === "works" && byId[parts[1]]) return { view: "work", w: byId[parts[1]], n: parseInt(parts[2], 10) || 1 };
-    return { view: "index", tab: parts[0] === "info" ? "info" : "works" };
+    const [a, b, c] = location.hash.replace(/^#\/?/, "").split("/");
+    if (a === "serie" && byId[b]) return { name: "series", s: byId[b], n: parseInt(c, 10) || 1 };
+    if (a === "grille") return { name: "grid" };
+    if (a === "studio") return { name: "studio" };
+    if (a === "contact") return { name: "contact" };
+    return { name: "index" };
   };
 
-  const render = () => {
-    const r = route();
-    body.classList.toggle("is-thumbs", r.view === "thumbnails");
-    stage.hidden = r.view === "thumbnails";
-    thumbs.hidden = r.view !== "thumbnails";
-    document.querySelectorAll("[data-view]").forEach((a) =>
-      a.classList.toggle("is-active", a.dataset.view === (r.view === "thumbnails" ? "thumbnails" : "index")),
-    );
-    stopCycle();
-    viewing = null;
+  let lastName = null;
 
-    if (r.view === "index") {
-      body.classList.add("panel-open");
-      setTab(r.tab);
-      document.title = "REA — Reverse Engineer Anything";
-      showFeatured(byId[featuredId] || works[0]);
-      startCycle();
-    } else if (r.view === "work") {
-      body.classList.remove("panel-open");
-      showWork(r.w, r.n);
-    } else {
-      body.classList.remove("panel-open");
-      document.title = "Thumbnails — REA";
-      buildThumbs();
-      window.scrollTo(0, 0);
-    }
+  const render = (keepScroll = false) => {
+    const r = route();
+    clearInterval(cycle);
+    viewing = null;
+    body.classList.toggle("scroll", ["grid", "studio", "contact"].includes(r.name));
+    body.classList.toggle("in-series", r.name === "series");
+    document.querySelectorAll("[data-route]").forEach((a) =>
+      a.classList.toggle(
+        "is-active",
+        a.dataset.route === r.name || (a.dataset.route === "index" && r.name === "series" && a.closest(".menu")),
+      ),
+    );
+    document.title = t("title");
+    if (r.name === "index") renderIndex();
+    else if (r.name === "series") renderSeries(r.s, r.n);
+    else if (r.name === "grid") renderGrid();
+    else if (r.name === "studio") renderStudio();
+    else renderContact();
+    if (!keepScroll && r.name !== lastName) window.scrollTo(0, 0);
+    lastName = r.name;
+    lastTarget = null;
     refreshCursor();
   };
 
-  window.addEventListener("hashchange", render);
+  window.addEventListener("hashchange", () => render());
 
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      location.hash = "#/";
-      return;
-    }
+    if (e.key === "Escape" && route().name !== "index") location.hash = "#/";
     if (!viewing) return;
-    const { w, n, total } = viewing;
-    if (e.key === "ArrowRight") location.hash = `#/works/${w.id}/${n === total ? 1 : n + 1}`;
-    if (e.key === "ArrowLeft") location.hash = `#/works/${w.id}/${n === 1 ? total : n - 1}`;
+    const { s, n, total } = viewing;
+    if (e.key === "ArrowRight") location.hash = `#/serie/${s.id}/${n === total ? 1 : n + 1}`;
+    if (e.key === "ArrowLeft") location.hash = `#/serie/${s.id}/${n === 1 ? total : n - 1}`;
   });
 
-  // Cursor: a 5px dot that eases after the pointer and carries a label ----
+  // Cursor --------------------------------------------------------------
+  // White text in difference blend mode: light over dark photographs, dark
+  // over the paper background, with no chip behind it.
 
+  const cursor = document.getElementById("cursor");
+  const label = cursor.querySelector(".label");
   const pos = { x: innerWidth / 2, y: innerHeight / 2 };
   const drawn = { ...pos };
   let lastTarget = null;
 
-  const refreshCursor = () => {
+  function refreshCursor() {
+    if (!finePointer) return;
     const el = lastTarget && lastTarget.isConnected ? lastTarget : document.elementFromPoint(pos.x, pos.y);
     const host = el && el.closest("[data-cursor]");
     const text = host ? host.dataset.cursor : "";
-    cursorLabel.textContent = text;
+    if (label.textContent !== text) label.textContent = text;
     cursor.classList.toggle("has-label", !!text);
-    cursor.classList.toggle("on-print", !!(el && el.closest(".print")));
-  };
+  }
 
   if (finePointer) {
     body.classList.add("has-cursor");
@@ -253,7 +367,6 @@
       refreshCursor();
     });
     document.addEventListener("pointerleave", () => cursor.classList.remove("has-label"));
-    // Scrolling moves content under a still pointer.
     addEventListener(
       "scroll",
       () => {
@@ -262,54 +375,58 @@
       },
       { passive: true },
     );
-    const tick = () => {
-      const k = reduced ? 1 : 0.28;
+    const loop = () => {
+      const k = reduced ? 1 : 0.24;
       drawn.x += (pos.x - drawn.x) * k;
       drawn.y += (pos.y - drawn.y) * k;
       cursor.style.transform = `translate(${drawn.x}px, ${drawn.y}px) translateY(-50%)`;
-      requestAnimationFrame(tick);
+      requestAnimationFrame(loop);
     };
-    tick();
-    // The element under a still pointer changes when the stage re-renders.
-    new MutationObserver(() => {
-      lastTarget = null;
-      refreshCursor();
-    }).observe(stage, { childList: true, subtree: false });
+    loop();
   }
 
-  // Intro: a quick run of prints before the index ------------------------
+  // Intro ---------------------------------------------------------------
 
-  const intro = document.getElementById("intro");
-  const frame = document.getElementById("intro-frame");
-  let seen = false;
-  try {
-    seen = sessionStorage.getItem("rea-intro") === "1";
-  } catch {}
-
-  const endIntro = () => {
-    intro.classList.add("is-done");
-    setTimeout(() => intro.remove(), 1000);
-    try {
-      sessionStorage.setItem("rea-intro", "1");
-    } catch {}
-  };
-
+  applyLang();
   render();
 
-  if (reduced || seen || route().view !== "index") {
+  const intro = document.getElementById("intro");
+  let seen = false;
+  try {
+    seen = sessionStorage.getItem("mv-intro") === "1";
+  } catch {}
+
+  if (reduced || seen || route().name !== "index") {
     intro.remove();
   } else {
-    const run = works.flatMap((w) => w.plates.slice(0, 2)).filter((p) => p.type !== "img").slice(0, 12);
+    const frame = document.getElementById("intro-frame");
+    const run = S.map((s) => s.photos[0]).concat(S.map((s) => s.photos[1]).filter(Boolean)).slice(0, 12);
     let i = 0;
-    const step = () => {
-      if (i >= run.length) return endIntro();
-      frame.replaceChildren(printEl(run[i++], { eager: true }));
-      timer = setTimeout(step, i === 1 ? 700 : 330);
-    };
-    let timer = setTimeout(step, 450);
-    intro.addEventListener("click", () => {
+    let timer;
+    const end = () => {
       clearTimeout(timer);
-      endIntro();
-    });
+      intro.classList.add("is-done");
+      setTimeout(() => intro.remove(), 1100);
+      try {
+        sessionStorage.setItem("mv-intro", "1");
+      } catch {}
+    };
+    const step = () => {
+      if (i >= run.length) return end();
+      const img = new Image();
+      img.src = run[i].src;
+      img.alt = "";
+      frame.replaceChildren(img);
+      i++;
+      timer = setTimeout(step, i === 1 ? 800 : 300);
+    };
+    // Start once the first photograph is ready, so the run never flashes blank.
+    const first = new Image();
+    first.onload = first.onerror = () => (timer = setTimeout(step, 250));
+    first.src = run[0].src;
+    run.slice(1).forEach((p) => (new Image().src = p.src));
+    intro.addEventListener("click", end);
+    // Never hold visitors on a slow connection.
+    setTimeout(() => !intro.classList.contains("is-done") && end(), 9000);
   }
 })();
