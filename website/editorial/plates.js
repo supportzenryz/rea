@@ -212,9 +212,10 @@
   const draw = { code, hex, ring, curve, otp, graph, mask, type };
 
   // Returns the inner markup for a plate; image plates become <img> elements.
-  window.renderPlate = (p) => {
+  // Thumbnails lazy-load; the print on the stage is always visible, so it loads eagerly.
+  window.renderPlate = (p, { eager = false } = {}) => {
     if (p.type === "img")
-      return `<img src="${esc(p.src)}" alt="${esc(p.alt || "")}" loading="lazy" decoding="async" class="${p.fill ? "fill" : ""}"/>`;
+      return `<img src="${esc(p.src)}" alt="${esc(p.alt || "")}" loading="${eager ? "eager" : "lazy"}" decoding="async" class="${p.fill ? "fill" : ""}"/>`;
     const H = Math.round(W / p.r);
     return draw[p.type](p, H);
   };
