@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>REA — Reverse Engineer Anything</title>
+    <meta
+      name="description"
+      content="REA investigations as a portfolio: Aegis, DownUnderCTF, DX-Ball, Notion and TH04, reverse engineered with your coding agent."
+    />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=JetBrains+Mono:wght@400&display=swap"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="intro" class="intro" aria-hidden="true">
+      <div class="intro-frame" id="intro-frame"></div>
+      <p class="intro-name">Reverse Engineer Anything</p>
+    </div>
+
+    <header class="masthead">
+      <a href="#/" class="wordmark" data-cursor="Index">REA <span>Reverse Engineer Anything</span></a>
+    </header>
+
+    <main id="app">
+      <section id="stage" class="stage" aria-live="polite"></section>
+      <section id="thumbs" class="thumbs" hidden></section>
+    </main>
+
+    <aside id="panel" class="panel" aria-label="Works and information">
+      <nav class="panel-tabs">
+        <button type="button" data-tab="works" class="is-active">Works</button>
+        <button type="button" data-tab="info">Info</button>
+        <a href="https://rea.tools/guides/" class="muted" target="_blank" rel="noopener">Docs</a>
+        <button type="button" class="panel-close" aria-label="Close panel" data-cursor="Close">×</button>
+      </nav>
+
+      <ol id="works-list" class="works-list" data-pane="works"></ol>
+
+      <div class="info" data-pane="info" hidden>
+        <p class="lede">
+          One MCP for reverse engineering across binaries, applications and runtime behavior.
+        </p>
+        <p>
+          See a feature you like. Ask your coding agent how it works, and REA gives it the tools to
+          inspect the code behind the answer — down to the binary level.
+        </p>
+
+        <h2>Install</h2>
+        <button type="button" class="cmd" data-copy="npx rea-agents@latest setup" data-cursor="Copy">
+          <code>npx rea-agents@latest setup</code><span class="cmd-state">Copy</span>
+        </button>
+
+        <h2>Elsewhere</h2>
+        <ul class="links">
+          <li><a href="https://github.com/morluto/rea" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://rea.tools/" target="_blank" rel="noopener">rea.tools</a></li>
+          <li><a href="https://www.npmjs.com/package/rea-agents" target="_blank" rel="noopener">npm</a></li>
+          <li><a href="https://discord.gg/GkcryMnJDM" target="_blank" rel="noopener">Discord</a></li>
+          <li><a href="https://x.com/reatools" target="_blank" rel="noopener">X</a></li>
+        </ul>
+
+        <p class="fine">MIT licensed. Get REA only from morluto/rea, rea.tools or the rea-agents npm package.</p>
+      </div>
+    </aside>
+
+    <nav class="switcher" aria-label="View">
+      <a href="#/" data-view="index">Index</a>
+      <span aria-hidden="true">—</span>
+      <a href="#/thumbnails" data-view="thumbnails">Thumbnails</a>
+    </nav>
+
+    <div id="cursor" class="cursor" aria-hidden="true"><span class="dot"></span><span class="label"></span></div>
+
+    <script src="works.js"></script>
+    <script src="plates.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
