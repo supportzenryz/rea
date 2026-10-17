@@ -19,9 +19,22 @@
   </head>
   <body>
     <div id="intro" class="intro" aria-hidden="true">
-      <div id="intro-frame" class="intro-frame"></div>
-      <p class="intro-name">Maison Vérane</p>
+      <div class="intro-bg"></div>
+      <div id="intro-stage" class="intro-stage"></div>
+      <p id="intro-name" class="intro-name">Maison Vérane</p>
+      <p class="intro-label">Studio de photographie — Paris</p>
+      <p class="intro-count"><span id="intro-count">000</span></p>
+      <span id="intro-bar" class="intro-bar"></span>
     </div>
+
+    <!-- Liquid smudge for the last intro frame: turbulence drives a displacement
+         whose strength app.js eases down to zero. -->
+    <svg class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+      <filter id="smudge" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.006 0.034" numOctaves="2" seed="7" result="noise" />
+        <feDisplacementMap id="smudge-map" in="SourceGraphic" in2="noise" scale="0" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
 
     <header class="top">
       <a href="#/" class="wordmark" data-cursor-text="index">Maison Vérane</a>

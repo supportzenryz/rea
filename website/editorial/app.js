@@ -97,6 +97,7 @@
 
   let cycle = null;
   let currentId = S[0].id;
+  let introActive = false; // holds the index cover still while the intro plays
 
   const renderIndex = () => {
     view.innerHTML =
@@ -104,7 +105,7 @@
       `<ol class="series-list">` +
       S.map(
         (s, i) =>
-          `<li><a href="#/serie/${s.id}/1" data-id="${s.id}">` +
+          `<li style="--i:${i}"><a href="#/serie/${s.id}/1" data-id="${s.id}">` +
           `<span class="num meta">${pad2(i + 1)}</span>` +
           `<span class="title">${esc(s.title)}</span>` +
           `<span class="info meta">${esc(t("cat." + s.cat))} — ${s.year}</span></a></li>`,
@@ -148,7 +149,7 @@
     show(currentId);
     if (!reduced)
       cycle = setInterval(() => {
-        if (hovering) return;
+        if (hovering || introActive) return;
         const i = S.findIndex((s) => s.id === currentId);
         show(S[(i + 1) % S.length].id);
       }, 4800);
@@ -387,46 +388,226 @@
 
   // Intro ---------------------------------------------------------------
 
-  applyLang();
-  render();
+  // Four beats: a loader that follows the real downloads; hard cuts that speed
+  // up then brake; a slow liquid smudge on the last frame while the name rises;
+  // and the last frame gliding into its place on the index as the interface
+  // cascades in. Plays once per visit (add ?intro to the URL to replay it).
 
+  applyLang();
   const intro = document.getElementById("intro");
   let seen = false;
   try {
     seen = sessionStorage.getItem("mv-intro") === "1";
   } catch {}
+  const playIntro = !reduced && (/[?&]intro\b/.test(location.search) || !seen) && route().name === "index";
+  if (playIntro) {
+    introActive = true;
+    currentId = S[0].id;
+    body.classList.add("pre-enter");
+  }
+  render();
+  if (playIntro) runIntro();
+  else intro.remove();
 
-  if (reduced || seen || route().name !== "index") {
-    intro.remove();
-  } else {
-    const frame = document.getElementById("intro-frame");
-    const run = S.map((s) => s.photos[0]).concat(S.map((s) => s.photos[1]).filter(Boolean)).slice(0, 12);
-    let i = 0;
-    let timer;
-    const end = () => {
-      clearTimeout(timer);
-      intro.classList.add("is-done");
-      setTimeout(() => intro.remove(), 1100);
-      try {
-        sessionStorage.setItem("mv-intro", "1");
-      } catch {}
+  function runIntro() {
+    const stage = document.getElementById("intro-stage");
+    const nameEl = document.getElementById("intro-name");
+    const countEl = document.getElementById("intro-count");
+    const bar = document.getElementById("intro-bar");
+    const label = intro.querySelector(".intro-label");
+    const map = document.getElementById("smudge-map");
+    const hero = S[0].photos[0];
+    const CUTS = [38748656, 5120186, 5792043, 14814802, 9213843, 37233404, 38934854, 7935409, 31305929, 5119521, 20900467, 31755145];
+    // How long each cut holds (ms): quick, quicker, then braking into the last frame.
+    const RHYTHM = [230, 180, 140, 115, 95, 82, 76, 76, 82, 98, 125, 165];
+    const timers = [];
+    const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+    const ease = { inOut: "cubic-bezier(.76,0,.24,1)", out: "cubic-bezier(.16,1,.3,1)", in: "cubic-bezier(.7,0,.84,0)" };
+    let raf = 0;
+    let done = false;
+    let heroEl = null;
+
+    nameEl.innerHTML = [...nameEl.textContent]
+      .map((c) => (c === " " ? `<span class="ch">&nbsp;</span>` : `<span class="ch"><span>${esc(c)}</span></span>`))
+      .join("");
+
+    // 1. Preload, with an honest counter (never faster than MIN, never stuck past MAX).
+    const sources = CUTS.map((id) => `assets/intro/${id}.jpg`).concat(hero.src);
+    let loaded = 0;
+    const imgs = sources.map((src) => {
+      const im = new Image();
+      im.alt = "";
+      im.src = src;
+      (im.decode ? im.decode() : new Promise((r) => (im.onload = im.onerror = r))).catch(() => {}).then(() => loaded++);
+      return im;
+    });
+    heroEl = imgs[imgs.length - 1];
+
+    const t0 = performance.now();
+    const MIN = 1100;
+    const MAX = 7000;
+    let shown = 0;
+    const tickLoad = (now) => {
+      if (done) return;
+      const target = Math.min(loaded / sources.length, (now - t0) / MIN);
+      shown += (target - shown) * 0.14;
+      if (target >= 1 && shown > 0.996) shown = 1;
+      countEl.textContent = String(Math.round(shown * 100)).padStart(3, "0");
+      bar.style.transform = `scaleX(${shown})`;
+      if (shown >= 1 || now - t0 > MAX) return startCuts();
+      raf = requestAnimationFrame(tickLoad);
     };
-    const step = () => {
-      if (i >= run.length) return end();
-      const img = new Image();
-      img.src = run[i].src;
-      img.alt = "";
-      frame.replaceChildren(img);
-      i++;
-      timer = setTimeout(step, i === 1 ? 800 : 300);
+    raf = requestAnimationFrame(tickLoad);
+
+    const ready = (im) => im.complete && im.naturalWidth > 0;
+    const place = (im) => {
+      im.className = "intro-shot";
+      stage.replaceChildren(im);
     };
-    // Start once the first photograph is ready, so the run never flashes blank.
-    const first = new Image();
-    first.onload = first.onerror = () => (timer = setTimeout(step, 250));
-    first.src = run[0].src;
-    run.slice(1).forEach((p) => (new Image().src = p.src));
-    intro.addEventListener("click", end);
-    // Never hold visitors on a slow connection.
-    setTimeout(() => !intro.classList.contains("is-done") && end(), 9000);
+
+    // 2. Hard cuts: each frame lands with a small scale settle and an exposure kick.
+    function startCuts() {
+      countEl.textContent = "100";
+      [countEl.parentElement, label].forEach((el) =>
+        el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 450, fill: "forwards" }),
+      );
+      bar.style.transformOrigin = "right";
+      bar.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }], { duration: 700, easing: ease.inOut, fill: "forwards" });
+
+      let at = 260;
+      imgs.slice(0, -1).filter(ready).forEach((im, k) => {
+        later(() => {
+          place(im);
+          im.animate(
+            [
+              { transform: "translate(-50%,-50%) scale(1.045)", filter: "brightness(1.22) contrast(1.06)" },
+              { transform: "translate(-50%,-50%) scale(1)", filter: "brightness(1) contrast(1)" },
+            ],
+            { duration: 170, easing: "cubic-bezier(.2,.8,.2,1)" },
+          );
+        }, at);
+        at += RHYTHM[k] ?? 90;
+      });
+      later(smudge, at);
+    }
+
+    // 3. The last frame arrives smeared and settles slowly into focus.
+    function smudge() {
+      if (!ready(heroEl)) return enter();
+      place(heroEl);
+      const D = 1900;
+      const start = performance.now();
+      const cubic = (t) => 1 - Math.pow(1 - t, 3);
+      const quint = (t) => 1 - Math.pow(1 - t, 5);
+      const frame = (now) => {
+        if (done) return;
+        const t = Math.min(1, (now - start) / D);
+        const e = cubic(t);
+        const disp = 150 * (1 - e);
+        map.setAttribute("scale", disp.toFixed(1));
+        heroEl.style.filter =
+          disp > 0.4
+            ? `url(#smudge) blur(${(16 * (1 - quint(t))).toFixed(2)}px) brightness(${(1 + 0.18 * (1 - e)).toFixed(3)})`
+            : "none";
+        heroEl.style.transform = `translate(-50%,-50%) scale(${(1 + 0.1 * (1 - e)).toFixed(4)}, ${(1 - 0.02 * (1 - e)).toFixed(4)})`;
+        heroEl.style.opacity = Math.min(1, t * 4).toFixed(3);
+        if (t < 1) raf = requestAnimationFrame(frame);
+        else later(enter, 420);
+      };
+      raf = requestAnimationFrame(frame);
+      nameEl.querySelectorAll(".ch > span").forEach((s, k) =>
+        s.animate([{ transform: "translateY(110%)" }, { transform: "translateY(0)" }], {
+          duration: 1100,
+          delay: 280 + k * 48,
+          easing: ease.out,
+          fill: "forwards",
+        }),
+      );
+    }
+
+    // 4. Into the site: the last frame glides to the index cover's exact spot.
+    function enter(fast = false) {
+      if (done) return;
+      done = true;
+      timers.forEach(clearTimeout);
+      cancelAnimationFrame(raf);
+      intro.classList.add("is-leaving");
+      const dur = fast ? 700 : 1250;
+
+      nameEl.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(-26px)" }], {
+        duration: fast ? 300 : 600,
+        easing: ease.in,
+        fill: "forwards",
+      });
+      [countEl.parentElement, label, bar].forEach((el) => el.animate([{ opacity: 0 }], { duration: 250, fill: "forwards" }));
+
+      const cascade = () => {
+        body.classList.add("entering");
+        body.classList.remove("pre-enter");
+        setTimeout(() => body.classList.remove("entering"), 2200);
+      };
+      const finish = () => {
+        intro.remove();
+        introActive = false;
+        try {
+          sessionStorage.setItem("mv-intro", "1");
+        } catch {}
+      };
+
+      const target = view.querySelector(`.feature-frame img[data-id="${S[0].id}"]`);
+      if (!ready(heroEl) || !target) {
+        intro.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 600, fill: "forwards" }).finished.then(finish);
+        cascade();
+        return;
+      }
+
+      if (heroEl.parentNode !== stage) place(heroEl);
+      heroEl.getAnimations().forEach((a) => a.cancel());
+      Object.assign(heroEl.style, { filter: "none", opacity: "1", transform: "translate(-50%,-50%)" });
+
+      const from = heroEl.getBoundingClientRect();
+      const box = target.getBoundingClientRect();
+      const r = heroEl.naturalWidth / heroEl.naturalHeight;
+      let w = box.width;
+      let h = w / r;
+      if (h > box.height) {
+        h = box.height;
+        w = h * r;
+      }
+      const to = { left: box.left + (box.width - w) / 2, top: box.top + (box.height - h) / 2, width: w };
+
+      Object.assign(heroEl.style, {
+        position: "fixed",
+        left: `${from.left}px`,
+        top: `${from.top}px`,
+        width: `${from.width}px`,
+        height: `${from.height}px`,
+        maxWidth: "none",
+        maxHeight: "none",
+        transform: "none",
+        transformOrigin: "0 0",
+      });
+      const move = heroEl.animate(
+        [
+          { transform: "translate(0px, 0px) scale(1)" },
+          { transform: `translate(${to.left - from.left}px, ${to.top - from.top}px) scale(${to.width / from.width})` },
+        ],
+        { duration: dur, easing: ease.inOut, fill: "forwards" },
+      );
+      intro.querySelector(".intro-bg").animate([{ opacity: 1 }, { opacity: 0 }], {
+        duration: dur * 0.75,
+        delay: dur * 0.3,
+        easing: "ease",
+        fill: "forwards",
+      });
+      setTimeout(cascade, dur * 0.45);
+      move.finished.then(finish);
+    }
+
+    const skip = () => enter(true);
+    intro.addEventListener("click", skip);
+    addEventListener("keydown", skip, { once: true });
+    addEventListener("wheel", skip, { once: true, passive: true });
+    addEventListener("touchmove", skip, { once: true, passive: true });
   }
 })();

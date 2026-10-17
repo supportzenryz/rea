@@ -675,37 +675,150 @@ body.has-cursor .cursor {
 
 /* Intro */
 
+.defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
 .intro {
   position: fixed;
   inset: 0;
   z-index: 100;
-  display: grid;
-  place-items: center;
-  background: var(--paper);
-  transition: opacity 1s ease;
 }
 
-.intro.is-done {
-  opacity: 0;
+.intro.is-leaving {
   pointer-events: none;
 }
 
-.intro-frame img {
-  max-width: 34vw;
-  max-height: 60vh;
+.intro-bg {
+  position: absolute;
+  inset: 0;
+  background: var(--paper);
+}
+
+.intro-stage {
+  position: absolute;
+  inset: 0;
+}
+
+/* Every frame is fitted into the same box, so changing ratios make each cut pop. */
+.intro-shot {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  max-width: 44vw;
+  max-height: 58vh;
   width: auto;
   height: auto;
+  transform: translate(-50%, -50%);
+  transform-origin: 50% 50%;
+  will-change: transform, filter;
 }
 
 .intro-name {
   position: absolute;
-  bottom: 30px;
+  left: 0;
+  right: 0;
+  bottom: 7vh;
   margin: 0;
-  font-size: 15px;
-  letter-spacing: 0.24em;
+  text-align: center;
+  font-size: clamp(38px, 6.4vw, 104px);
+  font-style: italic;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.intro-name .ch {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  padding: 0 0.02em 0.12em;
+  margin-bottom: -0.12em;
+}
+
+.intro-name .ch > span {
+  display: inline-block;
+  transform: translateY(110%);
+}
+
+.intro-label,
+.intro-count {
+  position: absolute;
+  bottom: 22px;
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  color: var(--muted);
+}
+
+.intro-label {
+  left: var(--pad);
+}
+
+.intro-count {
+  right: var(--pad);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.intro-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--ink);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+/* Site entrance: while the intro plays, the interface waits off-stage, then
+   cascades in as the last frame settles into the index. */
+
+body.pre-enter .top,
+body.pre-enter .bottom,
+body.pre-enter .series-list li,
+body.pre-enter .feature-caption {
   opacity: 0;
-  animation: fadeIn 2s ease forwards 0.4s;
+}
+
+body.pre-enter .top {
+  transform: translateY(-10px);
+}
+
+body.pre-enter .bottom,
+body.pre-enter .feature-caption {
+  transform: translateY(10px);
+}
+
+body.pre-enter .series-list li {
+  transform: translateY(22px);
+}
+
+body.entering .top,
+body.entering .bottom,
+body.entering .series-list li,
+body.entering .feature-caption {
+  transition:
+    opacity 1s var(--ease),
+    transform 1.3s var(--ease);
+}
+
+body.entering .series-list li {
+  transition-delay: calc(var(--i, 0) * 65ms + 120ms);
+}
+
+body.entering .feature-caption {
+  transition-delay: 0.5s;
+}
+
+body.entering .bottom {
+  transition-delay: 0.65s;
 }
 
 /* Motion */
@@ -907,7 +1020,13 @@ body.has-cursor .cursor {
     gap: 26px;
   }
 
-  .intro-frame img {
-    max-width: 70vw;
+  .intro-shot {
+    top: 44%;
+    max-width: 76vw;
+    max-height: 54vh;
+  }
+
+  .intro-name {
+    bottom: 64px;
   }
 }
