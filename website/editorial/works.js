@@ -18,6 +18,17 @@ const P = {
   paper: { bg: "#fbfaf7", fg: "#1a1a1a", acc: "#1a1a1a" },
 };
 
+// Photographs from Pexels (free to use under the Pexels license); see `credit`.
+const photo = (id, r, alt) => ({
+  type: "img",
+  r,
+  pal: P.ink,
+  src: `assets/photos/${id}.jpg`,
+  alt,
+  fill: true,
+  credit: `https://www.pexels.com/photo/${id}/`,
+});
+
 const DX_BYTES = [
   0x55, 0x8b, 0xec, 0x83, 0xec, 0x0c, 0x53, 0x56, 0x57, 0x8b, 0x45, 0x08, 0x89,
   0x45, 0xf4, 0xdb, 0x45, 0xf4, 0xdd, 0x55, 0xf8, 0xdc, 0x0d, 0x68, 0x00, 0x42,
@@ -34,6 +45,7 @@ window.REA_WORKS = [
     href: "https://rea.tools/showcase/aegis/",
     plates: [
       { type: "otp", r: 0.8, pal: P.tomato, code: "287 082", label: "HMAC-SHA1 · 6 digits · 30 s" },
+      photo(7989740, 0.8, "Phone and electronic gadgets laid out on a black surface"),
       {
         type: "code", r: 1.25, pal: P.cream, label: "com.beemdevelopment.aegis · TotpInfo",
         lines: [
@@ -73,6 +85,7 @@ window.REA_WORKS = [
     href: "https://rea.tools/showcase/ctf/",
     plates: [
       { type: "mask", r: 0.8, pal: P.sky, seed: 7, label: "26 checks × 36 characters" },
+      photo(6424583, 1.5, "Colored program code on a dark monitor"),
       { type: "img", r: 1.6, pal: P.paper, src: "assets/ctf-mask-equation.svg", alt: "One masked check written as an equation over flag characters" },
       { type: "type", r: 1, pal: P.ink, text: "DUCTF{", mono: true, caption: "the known prefix fixes six unknowns" },
       {
@@ -101,6 +114,7 @@ window.REA_WORKS = [
     text: "Rebuilding DX-Ball from its executable: the sound-pan calculation, recovered as C and checked against the original x86 bytes.",
     href: "https://rea.tools/showcase/dx-ball/",
     plates: [
+      photo(29702648, 1.5, "Arcade joystick and buttons under colored light"),
       { type: "img", r: 1.6, pal: P.paper, src: "assets/dx-ball-sound-pan-investigation.svg", alt: "DX-Ball sound pan investigation" },
       {
         type: "code", r: 0.8, pal: P.sea, label: "sub_406400",
@@ -116,6 +130,7 @@ window.REA_WORKS = [
         ],
       },
       { type: "curve", r: 1.25, pal: P.dusk, label: "pan = x · 1.5625 − 500" },
+      photo(30512715, 1.5, "Close-up of arcade controls"),
       { type: "hex", r: 1, pal: P.ink, base: 0x406400, label: ".text", bytes: DX_BYTES, mark: [21, 22, 23, 24, 25, 26, 30, 31, 32, 33, 34, 35], seed: 5 },
       {
         type: "code", r: 0.8, pal: P.cream, label: "recovered C",
@@ -141,6 +156,7 @@ window.REA_WORKS = [
         type: "graph", r: 0.8, pal: P.ochre, label: "renderer → main",
         nodes: ["renderer", "preload · invokerInMain", "ipcRenderer.invoke", "ipcMain.handle", "clipboard.write"],
       },
+      photo(4884116, 1.777, "Black laptop on a white desk"),
       {
         type: "code", r: 1.25, pal: P.ink, label: "preload.js",
         lines: [
@@ -165,6 +181,7 @@ window.REA_WORKS = [
     text: "Reconstructing TH04's bullet patterns: 16-bit assembly and recovered C++ show how a ring is spaced around 256 angle units and aimed at the player.",
     href: "https://rea.tools/showcase/th04/",
     plates: [
+      photo(9140600, 1.333, "Row of vintage CRT computer monitors"),
       { type: "ring", r: 0.8, pal: P.forest, count: 16, offset: 40, label: "angle = i · 16 + 40" },
       { type: "img", r: 1.92, pal: P.paper, src: "assets/th04-bullet-ring.svg", alt: "TH04 ring of sixteen bullets aimed at the player" },
       {
@@ -180,6 +197,7 @@ window.REA_WORKS = [
         ],
       },
       { type: "ring", r: 1, pal: P.tomato, count: 24, offset: 0, label: "24-way · unaimed" },
+      photo(8875501, 0.667, "Vintage computer monitors on a dark background"),
       { type: "hex", r: 0.8, pal: P.sea, base: 0, label: "MZ executable", bytes: [0x4d, 0x5a], mark: [0, 1], seed: 41 },
     ],
   },
@@ -192,6 +210,7 @@ window.REA_WORKS = [
     href: "https://github.com/morluto/rea",
     plates: [
       { type: "img", r: 1.6, pal: P.ink, src: "assets/rea-hopper-analysis.png", alt: "REA launching its analysis bridge inside Hopper", fill: true },
+      photo(3520692, 1.5, "Black and white close-up of a circuit board"),
       { type: "img", r: 1.6, pal: P.paper, src: "assets/rea-showcases.png", alt: "REA showcases overview", fill: true },
     ],
   },
@@ -206,6 +225,7 @@ window.REA_WORKS = [
     plates: [
       { type: "img", r: 1.6, pal: P.paper, src: "assets/rea-investigation-flow.svg", alt: "REA investigation flow" },
       { type: "img", r: 1.6, pal: P.cream, src: "assets/analyst-thinking.svg", alt: "An analyst thinking through a hypothesis" },
+      photo(6755083, 1.5, "Close-up of components on a circuit board"),
       { type: "type", r: 0.8, pal: P.dusk, text: "Ask. Find. Read. Check.", caption: "first investigation" },
     ],
   },

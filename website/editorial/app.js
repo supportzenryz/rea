@@ -16,12 +16,12 @@
   const name = (w) => `${w.title} — ${w.subtitle}`;
   const pad = (n) => String(n);
 
-  const printEl = (plate) => {
+  const printEl = (plate, opts) => {
     const el = document.createElement("div");
     el.className = "print";
     el.style.setProperty("--r", plate.r);
     el.style.setProperty("--plate-bg", plate.pal.bg);
-    el.innerHTML = window.renderPlate(plate);
+    el.innerHTML = window.renderPlate(plate, opts);
     return el;
   };
 
@@ -47,6 +47,15 @@
   list.addEventListener("pointerleave", () => {
     hoverId = null;
   });
+
+  // Photo credits, generated from the plates that carry one.
+  const credited = works.flatMap((w) => w.plates.filter((p) => p.credit));
+  document.getElementById("credits").innerHTML =
+    `Photographs from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a>: ` +
+    credited
+      .map((p, i) => `<a href="${p.credit}" target="_blank" rel="noopener" title="${p.alt}">${i + 1}</a>`)
+      .join(", ") +
+    ".";
 
   // Panel tabs ------------------------------------------------------------
 
@@ -87,7 +96,7 @@
     a.href = `#/works/${w.id}/1`;
     a.dataset.cursor = `${name(w)} — View`;
     a.setAttribute("aria-label", `Open ${name(w)}`);
-    a.appendChild(printEl(w.plates[0]));
+    a.appendChild(printEl(w.plates[0], { eager: true }));
     inner.appendChild(a);
     stage.replaceChildren(inner);
     list.querySelectorAll("a").forEach((x) => x.classList.toggle("is-current", x.dataset.id === w.id));
@@ -115,7 +124,7 @@
     featuredId = null;
     const inner = document.createElement("div");
     inner.className = "stage-inner";
-    const print = printEl(w.plates[n - 1]);
+    const print = printEl(w.plates[n - 1], { eager: true });
     const zones = document.createElement("div");
     zones.className = "zones";
     zones.innerHTML =
@@ -128,7 +137,10 @@
     cap.className = "caption";
     cap.innerHTML =
       (n === 1 ? `${w.text} ` : `${name(w)}, ${w.kind}. `) +
-      `<a href="${w.href}" target="_blank" rel="noopener">Read the investigation</a>`;
+      `<a href="${w.href}" target="_blank" rel="noopener">Read the investigation</a>` +
+      (w.plates[n - 1].credit
+        ? ` · <a href="${w.plates[n - 1].credit}" target="_blank" rel="noopener">Photo: Pexels</a>`
+        : "");
     inner.append(print, cap);
     stage.replaceChildren(inner);
     document.title = `${name(w)} — REA`;
@@ -291,7 +303,7 @@
     let i = 0;
     const step = () => {
       if (i >= run.length) return endIntro();
-      frame.replaceChildren(printEl(run[i++]));
+      frame.replaceChildren(printEl(run[i++], { eager: true }));
       timer = setTimeout(step, i === 1 ? 700 : 330);
     };
     let timer = setTimeout(step, 450);

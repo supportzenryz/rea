@@ -383,6 +383,15 @@ body.panel-open .panel {
   color: var(--muted);
 }
 
+.info .credits {
+  margin-top: 10px;
+}
+
+.info .credits a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* Thumbnails ------------------------------------------------------------- */
 
 .thumbs {
