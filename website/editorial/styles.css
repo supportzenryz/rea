@@ -1,10 +1,11 @@
 :root {
-  --paper: #f6f5f2;
-  --ink: #111;
-  --muted: #9a9892;
-  --pad: 28px;
-  --font: "Inter", system-ui, -apple-system, sans-serif;
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --paper: #fff;
+  --ink: #1a1a1a;
+  --muted: #a9a9a9;
+  --rule: #ececec;
+  --serif: "Cormorant Garamond", Georgia, serif;
+  --panel-w: clamp(290px, 27vw, 400px);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 * {
@@ -20,14 +21,15 @@ body {
 body {
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--font);
-  font-size: 13px;
-  line-height: 1.5;
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.4;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
 
-body.scroll {
+body.is-thumbs {
   overflow-y: auto;
 }
 
@@ -36,12 +38,26 @@ a {
   text-decoration: none;
 }
 
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
 img {
   display: block;
 }
 
-.muted {
-  color: var(--muted);
+.underline,
+.switch a.is-active,
+.tabs .is-active,
+.works a.is-current .title {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -52,68 +68,76 @@ img {
   }
 }
 
-/* Header ----------------------------------------------------------------- */
+/* Name (top centre) and view switch (bottom centre). Both re-centre in the
+   space left of the panel when it is open. */
 
-.top {
-  position: fixed;
-  inset: 0 0 auto 0;
-  z-index: 20;
-  display: flex;
-  justify-content: space-between;
-  padding: 22px var(--pad);
-  pointer-events: none;
-}
-
-.top > * {
-  pointer-events: auto;
-}
-
-.menu {
-  display: flex;
-  gap: 22px;
-}
-
-.menu a {
-  color: var(--muted);
-  transition: color 0.3s;
-}
-
-.menu a:hover,
-.menu a.is-active {
-  color: var(--ink);
-}
-
-/* Views ------------------------------------------------------------------ */
-
-#view {
-  height: 100%;
-}
-
-.view {
-  animation: fade 0.6s ease both;
-}
-
-.foot {
+.masthead,
+.switch {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
   z-index: 20;
   display: flex;
-  justify-content: space-between;
-  padding: 20px var(--pad);
+  justify-content: center;
   pointer-events: none;
+  transition: padding-right 0.8s var(--ease);
 }
 
-.foot > * {
+.masthead {
+  top: 0;
+  padding: 24px 16px 14px;
+}
+
+.switch {
+  bottom: 0;
+  gap: 18px;
+  padding: 14px 16px 22px;
+  font-size: 15px;
+}
+
+body.panel-open .masthead,
+body.panel-open .switch {
+  padding-right: var(--panel-w);
+}
+
+body.is-thumbs .masthead {
+  background: linear-gradient(var(--paper) 70%, rgba(255, 255, 255, 0));
+}
+
+body.is-thumbs .switch {
+  background: linear-gradient(rgba(255, 255, 255, 0), var(--paper) 45%);
+}
+
+.masthead > *,
+.switch > * {
   pointer-events: auto;
 }
 
-/* One photograph, centred: used by the landing slideshow and project pages. */
+.name {
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.switch span {
+  color: var(--muted);
+}
+
+/* Stage: one photograph, centred, crossfading to the next. */
 
 .stage {
   position: fixed;
-  inset: 64px var(--pad) 60px;
+  inset: 88px 6vw 82px;
+  transition: right 0.8s var(--ease);
+}
+
+body.panel-open .stage {
+  right: calc(var(--panel-w) + 6vw);
+}
+
+.stage[hidden],
+.thumbs[hidden] {
+  display: none;
 }
 
 .stage img {
@@ -123,15 +147,15 @@ img {
   height: 100%;
   object-fit: contain;
   opacity: 0;
-  transition: opacity 1.4s ease;
+  transition: opacity 1.2s ease;
 }
 
 .stage img.is-shown {
   opacity: 1;
 }
 
-.project .stage img {
-  transition-duration: 0.5s;
+body.in-project .stage img {
+  transition-duration: 0.45s;
 }
 
 .zones {
@@ -142,77 +166,158 @@ img {
   grid-template-columns: 1fr 1fr;
 }
 
-/* Work: project covers */
-
-.work {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 72px 5vw;
-  align-items: end;
-  padding: 120px 8vw 120px;
+/* On touch screens there is no cursor label, so the count sits under the photo. */
+.touch-count {
+  display: none;
 }
 
-.cover img {
-  width: 100%;
-  height: auto;
-  transition: opacity 0.4s;
+@media (hover: none) {
+  .touch-count {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 52px;
+    margin: 0;
+    text-align: center;
+    font-size: 14px;
+    color: var(--muted);
+    z-index: 19;
+  }
 }
 
-.work:hover .cover img {
-  opacity: 0.55;
+/* Panel ------------------------------------------------------------------ */
+
+.panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  width: var(--panel-w);
+  padding: 22px 30px 40px;
+  background: var(--paper);
+  border-left: 1px solid var(--rule);
+  overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform 0.8s var(--ease);
 }
 
-.work .cover:hover img {
-  opacity: 1;
+body.panel-open .panel {
+  transform: none;
 }
 
-.cover .caption {
+.tabs {
   display: flex;
-  justify-content: space-between;
-  margin-top: 10px;
-}
-
-/* Info */
-
-.info {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 6vw;
-  min-height: 100%;
-  padding: 120px var(--pad) 80px;
-  align-content: start;
-}
-
-.bio p {
-  margin: 0 0 1.2em;
-  max-width: 44ch;
+  align-items: baseline;
+  gap: 18px;
+  margin-bottom: 48px;
   font-size: 15px;
-  line-height: 1.55;
 }
 
-.contact {
-  display: grid;
-  grid-template-columns: 110px 1fr;
-  gap: 6px 16px;
+.tabs [data-tab]:not(.is-active) {
+  color: var(--ink);
+}
+
+.tabs .close {
+  margin-left: auto;
+  font-size: 19px;
+  line-height: 1;
+  color: var(--muted);
+  transition: color 0.2s;
+}
+
+.tabs .close:hover {
+  color: var(--ink);
+}
+
+.works {
+  list-style: none;
   margin: 0;
-  align-self: start;
+  padding: 0;
 }
 
-.contact dt {
+.works a {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 15.5px;
+  transition: color 0.25s;
+}
+
+.works .count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.works:hover a {
   color: var(--muted);
 }
 
-.contact dd {
-  margin: 0;
+.works a:hover,
+.works:hover a.is-current {
+  color: var(--ink);
 }
 
-.contact a:hover {
+.info p {
+  margin: 0 0 1.1em;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.info dl {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 4px 12px;
+  margin: 36px 0 0;
+  font-size: 15px;
+}
+
+.info dt {
+  color: var(--muted);
+}
+
+.info dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.info a:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-/* Cursor: a dot (and in viewers a word) in difference blend, so it reads on
-   dark photographs and on the paper alike. */
+/* Thumbnails -------------------------------------------------------------- */
+
+.thumbs {
+  columns: 3;
+  column-gap: 7vw;
+  padding: 110px 12vw 120px;
+}
+
+.thumb {
+  display: block;
+  break-inside: avoid;
+  margin: 0 0 8vw;
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+.thumb.is-in {
+  animation: rise 0.9s var(--ease) forwards;
+}
+
+.thumb img {
+  width: 100%;
+  height: auto;
+  background: #f2f2f2;
+}
+
+/* Cursor: a dot and a label in difference blend, light over photographs and
+   dark over the page. */
 
 .cursor {
   position: fixed;
@@ -221,11 +326,12 @@ img {
   z-index: 999;
   display: none;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   color: #fff;
   mix-blend-mode: difference;
-  pointer-events: none;
+  font-size: 15px;
   white-space: nowrap;
+  pointer-events: none;
   will-change: transform;
 }
 
@@ -234,8 +340,8 @@ body.has-cursor .cursor {
 }
 
 .cursor .dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: currentColor;
   transform: translateX(-50%);
@@ -250,7 +356,7 @@ body.has-cursor .cursor {
   opacity: 1;
 }
 
-/* Opening: the name alone, then the first photograph. */
+/* Opening: the name alone, then the page clears to the first photograph. */
 
 .intro {
   position: fixed;
@@ -269,7 +375,9 @@ body.has-cursor .cursor {
 
 .intro-name {
   margin: 0;
-  font-size: 13px;
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   opacity: 0;
   transition: opacity 1.2s ease;
 }
@@ -283,9 +391,10 @@ body.has-cursor .cursor {
   transition-duration: 0.8s;
 }
 
-@keyframes fade {
-  from {
-    opacity: 0;
+@keyframes rise {
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -296,51 +405,62 @@ body.has-cursor .cursor {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
-}
-
-/* Smaller screens -------------------------------------------------------- */
-
-@media (max-width: 1000px) {
-  .work {
-    grid-template-columns: repeat(2, 1fr);
-    padding: 100px var(--pad) 100px;
+  .thumb {
+    opacity: 1;
+    transform: none;
   }
 }
 
-@media (max-width: 640px) {
+/* Phones: the panel rises from the bottom; the photo shares the screen. */
+
+@media (max-width: 760px) {
   :root {
-    --pad: 16px;
+    --panel-w: 100vw;
   }
 
-  .top {
-    padding: 16px var(--pad);
-  }
-
-  .foot {
-    padding: 14px var(--pad);
+  .masthead {
+    padding-top: 18px;
   }
 
   .stage {
-    inset: 56px var(--pad) 50px;
+    inset: 64px 16px 92px;
   }
 
-  .work {
-    grid-template-columns: 1fr;
-    gap: 44px;
-    padding: 76px var(--pad) 60px;
+  body.panel-open .masthead,
+  body.panel-open .switch {
+    padding-right: 16px;
   }
 
-  .work:hover .cover img {
-    opacity: 1;
+  body.panel-open .stage {
+    right: 16px;
+    bottom: calc(58vh + 16px);
   }
 
-  .info {
-    grid-template-columns: 1fr;
-    gap: 40px;
-    padding: 90px var(--pad) 60px;
+  .panel {
+    top: auto;
+    height: 58vh;
+    padding: 20px 16px 70px;
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+    transform: translateY(100%);
   }
 
-  .contact {
-    grid-template-columns: 90px 1fr;
+  .tabs {
+    margin-bottom: 24px;
+  }
+
+  body.panel-open .switch {
+    z-index: 40;
+    background: var(--paper);
+  }
+
+  .thumbs {
+    columns: 2;
+    column-gap: 14px;
+    padding: 64px 16px 90px;
+  }
+
+  .thumb {
+    margin-bottom: 18px;
   }
 }

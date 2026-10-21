@@ -1,11 +1,16 @@
-// Routes: #/ (slideshow), #/work, #/work/<project>/<n>, #/info.
+// Routes: #/ (slideshow), #/work/<project>/<n>, #/thumbnails,
+// #/index and #/info (slideshow with the panel open on that tab).
 
 (() => {
   const LANDING = window.LANDING;
   const PROJECTS = window.PROJECTS;
   const byId = Object.fromEntries(PROJECTS.map((p) => [p.id, p]));
   const body = document.body;
-  const view = document.getElementById("view");
+  const stageEl = document.getElementById("stage");
+  const thumbsEl = document.getElementById("thumbs");
+  const worksEl = document.getElementById("works");
+  const infoEl = document.getElementById("info");
+  const touchCount = document.getElementById("touch-count");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const finePointer = matchMedia("(hover: hover) and (pointer: fine)").matches;
 
@@ -22,146 +27,180 @@
 
   const esc = (s) =>
     String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-  const pad2 = (n) => String(n).padStart(2, "0");
+  const preload = (src) => src && (new Image().src = src);
 
-  // A stage shows one photograph and crossfades to the next. Only the current
-  // image and the one after it are ever loaded.
-  const makeStage = (el) => {
-    let current = null;
-    return (src, alt) => {
-      if (current && current.dataset.src === src) return;
-      const img = new Image();
-      img.dataset.src = src;
-      img.alt = alt || "";
-      img.decoding = "async";
-      img.src = src;
-      el.prepend(img);
-      const prev = current;
-      current = img;
-      const reveal = () => {
-        if (current !== img) return;
-        img.classList.add("is-shown");
-        if (prev) {
-          prev.classList.remove("is-shown");
-          setTimeout(() => prev.remove(), 1500);
-        }
-      };
-      if (img.complete) requestAnimationFrame(reveal);
-      else img.addEventListener("load", reveal, { once: true });
+  // Stage: shows one photograph and crossfades to the next. Shared by the
+  // slideshow and the projects, so moving between them is one dissolve.
+
+  let shownSrc = null;
+  let shownImg = null;
+  const show = (src, alt = "") => {
+    if (shownSrc === src) return;
+    shownSrc = src;
+    const img = new Image();
+    img.alt = alt;
+    img.decoding = "async";
+    img.src = src;
+    stageEl.prepend(img);
+    const prev = shownImg;
+    shownImg = img;
+    const reveal = () => {
+      if (shownImg !== img) return img.remove();
+      img.classList.add("is-shown");
+      if (prev) {
+        prev.classList.remove("is-shown");
+        setTimeout(() => prev.remove(), 1300);
+      }
     };
+    if (img.complete) requestAnimationFrame(reveal);
+    else img.addEventListener("load", reveal, { once: true });
   };
 
-  const preload = (src) => {
-    if (src) new Image().src = src;
+  // Panel ---------------------------------------------------------------
+
+  worksEl.innerHTML = PROJECTS.map(
+    (p) =>
+      `<li><a href="#/work/${p.id}/1" data-id="${p.id}">` +
+      `<span class="title">${esc(p.title)}</span><span class="count">${p.photos.length}</span></a></li>`,
+  ).join("");
+
+  infoEl.innerHTML =
+    BIO.map((t) => `<p>${esc(t)}</p>`).join("") +
+    `<dl>` +
+    `<dt>Email</dt><dd><a href="mailto:${CONTACT.email}">${esc(CONTACT.email)}</a></dd>` +
+    `<dt>Instagram</dt><dd><a href="${CONTACT.instagram.href}" target="_blank" rel="noopener">${esc(CONTACT.instagram.label)}</a></dd>` +
+    `<dt>Based</dt><dd>${esc(CONTACT.based)}</dd>` +
+    `</dl>`;
+
+  const setTab = (tab) => {
+    document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("is-active", b.dataset.tab === tab));
+    document.querySelectorAll("[data-pane]").forEach((p) => (p.hidden = p.dataset.pane !== tab));
+  };
+  const openPanel = (tab = "works") => {
+    setTab(tab);
+    body.classList.add("panel-open");
+    markSwitch();
+  };
+  const closePanel = () => {
+    body.classList.remove("panel-open");
+    markSwitch();
   };
 
-  // Landing slideshow ---------------------------------------------------
+  document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
+  document.querySelector(".tabs .close").addEventListener("click", closePanel);
 
-  let slideTimer = null;
+  // Hovering a project previews its cover; leaving the list restores the view.
+  worksEl.addEventListener("pointerover", (e) => {
+    const a = e.target.closest("a[data-id]");
+    if (a && !stageEl.hidden) show(byId[a.dataset.id].photos[0].src);
+  });
+  worksEl.addEventListener("pointerleave", () => !stageEl.hidden && showCurrent());
+  worksEl.addEventListener("click", () => body.classList.remove("panel-open"));
+
+  // Index — Thumbnails ----------------------------------------------------
+
+  const markSwitch = () => {
+    const thumbs = route().name === "thumbnails";
+    document.querySelector('[data-view="index"]').classList.toggle("is-active", body.classList.contains("panel-open"));
+    document.querySelector('[data-view="thumbnails"]').classList.toggle("is-active", thumbs);
+  };
+
+  let lastStageHash = "#/";
+  document.querySelector('[data-view="index"]').addEventListener("click", (e) => {
+    e.preventDefault();
+    if (route().name === "thumbnails") {
+      location.hash = lastStageHash;
+      requestAnimationFrame(() => openPanel("works"));
+    } else if (body.classList.contains("panel-open")) closePanel();
+    else openPanel("works");
+  });
+
+  // Slideshow -----------------------------------------------------------
+
   let slide = 0;
+  let slideTimer = null;
   let introPlaying = false;
 
-  const renderLanding = () => {
-    view.innerHTML =
-      `<section class="view landing">` +
-      `<div class="stage"><div class="zones"><a href="#/" data-dir="1" data-cursor="Next" aria-label="Next photograph" style="grid-column: 1 / -1"></a></div></div>` +
-      `<footer class="foot"><span></span><span class="muted count"></span></footer>` +
-      `</section>`;
-    const stageEl = view.querySelector(".stage");
-    const show = makeStage(stageEl);
-    const count = view.querySelector(".count");
-
-    const go = (i) => {
-      slide = (i + LANDING.length) % LANDING.length;
-      show(LANDING[slide].src);
-      count.textContent = `${pad2(slide + 1)} / ${pad2(LANDING.length)}`;
-      preload(LANDING[(slide + 1) % LANDING.length].src);
-      schedule();
-    };
-    const schedule = () => {
-      clearTimeout(slideTimer);
-      if (reduced) return;
-      slideTimer = setTimeout(() => (introPlaying ? schedule() : go(slide + 1)), 5200);
-    };
-
-    view.querySelector(".zones a").addEventListener("click", (e) => {
-      e.preventDefault();
-      go(slide + 1);
-    });
-    landingStep = (d) => go(slide + d);
-    go(slide);
+  const showSlide = (i) => {
+    slide = (i + LANDING.length) % LANDING.length;
+    show(LANDING[slide].src);
+    preload(LANDING[(slide + 1) % LANDING.length].src);
+    label(`${slide + 1}/${LANDING.length}`);
+    clearTimeout(slideTimer);
+    if (!reduced) slideTimer = setTimeout(function next() {
+      if (introPlaying || route().name !== "landing") return (slideTimer = setTimeout(next, 1000));
+      showSlide(slide + 1);
+    }, 5200);
   };
 
-  let landingStep = null;
-
-  // Work ----------------------------------------------------------------
-
-  const renderWork = () => {
-    view.innerHTML =
-      `<section class="view work">` +
-      PROJECTS.map(
-        (p) =>
-          `<a class="cover" href="#/work/${p.id}/1">` +
-          `<img src="${p.photos[0].src}" alt="${esc(p.title)}" loading="lazy" decoding="async" style="aspect-ratio:${p.photos[0].r}" />` +
-          `<span class="caption"><span>${esc(p.title)}</span><span class="muted">${p.photos.length}</span></span></a>`,
-      ).join("") +
-      `</section>`;
-  };
-
-  // Project -------------------------------------------------------------
+  // Projects ------------------------------------------------------------
 
   let viewing = null;
-  let projectShow = null;
 
   const projectHref = (p, n) => {
     if (n < 1) {
       const prev = PROJECTS[(PROJECTS.indexOf(p) - 1 + PROJECTS.length) % PROJECTS.length];
       return `#/work/${prev.id}/${prev.photos.length}`;
     }
-    if (n > p.photos.length) {
-      const next = PROJECTS[(PROJECTS.indexOf(p) + 1) % PROJECTS.length];
-      return `#/work/${next.id}/1`;
-    }
+    if (n > p.photos.length) return `#/work/${PROJECTS[(PROJECTS.indexOf(p) + 1) % PROJECTS.length].id}/1`;
     return `#/work/${p.id}/${n}`;
   };
 
-  const renderProject = (p, n, sameProject) => {
+  const showProject = (p, n) => {
     const total = p.photos.length;
     n = Math.min(Math.max(n, 1), total);
     viewing = { p, n, total };
-    if (!sameProject) {
-      view.innerHTML =
-        `<section class="view project">` +
-        `<div class="stage"><div class="zones"><a data-zone="prev"></a><a data-zone="next"></a></div></div>` +
-        `<footer class="foot"><span>${esc(p.title)}</span><span class="muted count"></span></footer>` +
-        `</section>`;
-      projectShow = makeStage(view.querySelector(".stage"));
-    }
-    projectShow(p.photos[n - 1].src, `${p.title}, ${n} of ${total}`);
-    view.querySelector(".count").textContent = `${n} / ${total}`;
-    const prev = view.querySelector('[data-zone="prev"]');
-    const next = view.querySelector('[data-zone="next"]');
-    prev.href = projectHref(p, n - 1);
-    next.href = projectHref(p, n + 1);
-    prev.dataset.cursor = "Previous";
-    next.dataset.cursor = n === total ? "Next project" : "Next";
-    prev.setAttribute("aria-label", "Previous photograph");
-    next.setAttribute("aria-label", n === total ? "Next project" : "Next photograph");
+    show(p.photos[n - 1].src, `${p.title}, ${n} of ${total}`);
     preload(p.photos[n] && p.photos[n].src);
+    label(`${p.title} — ${n}/${total}`);
+    worksEl.querySelectorAll("a").forEach((a) => a.classList.toggle("is-current", a.dataset.id === p.id));
     document.title = `${p.title} — Sundar Rajan`;
   };
 
-  // Info ----------------------------------------------------------------
+  const showCurrent = () => {
+    if (viewing) show(viewing.p.photos[viewing.n - 1].src);
+    else show(LANDING[slide].src);
+  };
 
-  const renderInfo = () => {
-    view.innerHTML =
-      `<section class="view info">` +
-      `<div class="bio">${BIO.map((t) => `<p>${esc(t)}</p>`).join("")}</div>` +
-      `<dl class="contact">` +
-      `<dt>Email</dt><dd><a href="mailto:${CONTACT.email}">${esc(CONTACT.email)}</a></dd>` +
-      `<dt>Instagram</dt><dd><a href="${CONTACT.instagram.href}">${esc(CONTACT.instagram.label)}</a></dd>` +
-      `<dt>Based</dt><dd>${esc(CONTACT.based)}</dd>` +
-      `</dl></section>`;
+  // Cursor labels for the two halves of the photograph, and the touch count.
+  const [zonePrev, zoneNext] = stageEl.querySelectorAll(".zones a");
+  function label(text) {
+    zonePrev.dataset.cursor = `‹ ${text}`;
+    zoneNext.dataset.cursor = `${text} ›`;
+    touchCount.textContent = text.replace("/", " / ");
+    refreshCursor();
+  }
+
+  const step = (d) => {
+    if (viewing) location.hash = projectHref(viewing.p, viewing.n + d);
+    else showSlide(slide + d);
+  };
+  zonePrev.addEventListener("click", (e) => (e.preventDefault(), step(-1)));
+  zoneNext.addEventListener("click", (e) => (e.preventDefault(), step(1)));
+
+  // Thumbnails ------------------------------------------------------------
+
+  let thumbsBuilt = false;
+  const buildThumbs = () => {
+    if (thumbsBuilt) return;
+    thumbsBuilt = true;
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          e.target.classList.add("is-in");
+          io.unobserve(e.target);
+        }),
+      { rootMargin: "0px 0px -5% 0px" },
+    );
+    thumbsEl.innerHTML = PROJECTS.flatMap((p) =>
+      p.photos.map(
+        (ph, i) =>
+          `<a class="thumb" href="#/work/${p.id}/${i + 1}" data-cursor="${esc(p.title)} — ${i + 1}/${p.photos.length}">` +
+          `<img src="${ph.src}" alt="${esc(p.title)}, ${i + 1} of ${p.photos.length}" loading="lazy" decoding="async" style="aspect-ratio:${ph.r}" /></a>`,
+      ),
+    ).join("");
+    thumbsEl.querySelectorAll(".thumb").forEach((t) => io.observe(t));
   };
 
   // Router --------------------------------------------------------------
@@ -169,30 +208,35 @@
   const route = () => {
     const [a, b, c] = location.hash.replace(/^#\/?/, "").split("/");
     if (a === "work" && byId[b]) return { name: "project", p: byId[b], n: parseInt(c, 10) || 1 };
-    if (a === "work") return { name: "work" };
-    if (a === "info") return { name: "info" };
-    return { name: "landing" };
+    if (a === "thumbnails") return { name: "thumbnails" };
+    return { name: "landing", panel: a === "info" ? "info" : a === "index" ? "works" : null };
   };
-
-  let last = null;
 
   const render = () => {
     const r = route();
-    const sameProject = r.name === "project" && last && last.name === "project" && last.p === r.p;
-    clearTimeout(slideTimer);
-    landingStep = null;
-    viewing = null;
-    body.classList.toggle("scroll", r.name === "work" || r.name === "info");
-    document.querySelectorAll("[data-route]").forEach((a) =>
-      a.classList.toggle("is-active", a.dataset.route === r.name || (a.dataset.route === "work" && r.name === "project")),
-    );
+    const thumbs = r.name === "thumbnails";
+    body.classList.toggle("is-thumbs", thumbs);
+    body.classList.toggle("in-project", r.name === "project");
+    stageEl.hidden = thumbs;
+    thumbsEl.hidden = !thumbs;
     document.title = "Sundar Rajan";
-    if (r.name === "landing") renderLanding();
-    else if (r.name === "work") renderWork();
-    else if (r.name === "project") renderProject(r.p, r.n, sameProject);
-    else renderInfo();
-    if (!sameProject) window.scrollTo(0, 0);
-    last = r;
+
+    if (thumbs) {
+      body.classList.remove("panel-open");
+      buildThumbs();
+      window.scrollTo(0, 0);
+      touchCount.textContent = "";
+    } else {
+      lastStageHash = location.hash || "#/";
+      if (r.name === "project") showProject(r.p, r.n);
+      else {
+        viewing = null;
+        worksEl.querySelectorAll("a").forEach((a) => a.classList.remove("is-current"));
+        showSlide(slide);
+        if (r.panel) openPanel(r.panel);
+      }
+    }
+    markSwitch();
     lastTarget = null;
     refreshCursor();
   };
@@ -200,21 +244,20 @@
   window.addEventListener("hashchange", render);
 
   document.addEventListener("keydown", (e) => {
-    if (viewing) {
-      const { p, n } = viewing;
-      if (e.key === "ArrowRight") location.hash = projectHref(p, n + 1);
-      if (e.key === "ArrowLeft") location.hash = projectHref(p, n - 1);
-      if (e.key === "Escape") location.hash = "#/work";
-    } else if (landingStep) {
-      if (e.key === "ArrowRight") landingStep(1);
-      if (e.key === "ArrowLeft") landingStep(-1);
+    if (e.key === "Escape") {
+      if (body.classList.contains("panel-open")) closePanel();
+      else if (route().name !== "landing") location.hash = "#/";
+      return;
     }
+    if (stageEl.hidden) return;
+    if (e.key === "ArrowRight") step(1);
+    if (e.key === "ArrowLeft") step(-1);
   });
 
   // Cursor --------------------------------------------------------------
 
   const cursor = document.getElementById("cursor");
-  const label = cursor.querySelector(".label");
+  const cursorLabel = cursor.querySelector(".label");
   const pos = { x: innerWidth / 2, y: innerHeight / 2 };
   const drawn = { ...pos };
   let lastTarget = null;
@@ -224,7 +267,7 @@
     const el = lastTarget && lastTarget.isConnected ? lastTarget : document.elementFromPoint(pos.x, pos.y);
     const host = el && el.closest("[data-cursor]");
     const text = host ? host.dataset.cursor : "";
-    if (label.textContent !== text) label.textContent = text;
+    if (cursorLabel.textContent !== text) cursorLabel.textContent = text;
     cursor.classList.toggle("has-label", !!text);
   }
 
@@ -255,8 +298,8 @@
     loop();
   }
 
-  // Opening: the name fades in alone, then the page dissolves to reveal the
-  // first photograph. Once per visit; add ?intro to the URL to see it again.
+  // Opening: the name alone, then the page clears to the first photograph.
+  // Once per visit; add ?intro to the URL to see it again.
 
   const intro = document.getElementById("intro");
   let seen = false;
@@ -283,16 +326,16 @@
       } catch {}
     };
     requestAnimationFrame(() => requestAnimationFrame(() => intro.classList.add("is-in")));
-    // Wait for the first photograph, so it is there when the page clears.
     const first = new Image();
     first.src = LANDING[0].src;
-    const minHold = new Promise((r) => setTimeout(r, 2200));
     const loaded = new Promise((r) => {
       if (first.complete) r();
       first.onload = first.onerror = r;
     });
-    const cap = new Promise((r) => setTimeout(r, 6000));
-    Promise.race([Promise.all([minHold, loaded]), cap]).then(end);
+    Promise.race([
+      Promise.all([loaded, new Promise((r) => setTimeout(r, 2200))]),
+      new Promise((r) => setTimeout(r, 6000)),
+    ]).then(end);
     intro.addEventListener("click", end);
     addEventListener("keydown", end, { once: true });
   }

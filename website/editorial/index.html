@@ -8,21 +8,43 @@
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400&display=swap" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&display=swap"
+    />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div id="intro" class="intro" aria-hidden="true"><p class="intro-name">Sundar Rajan</p></div>
 
-    <header class="top">
+    <header class="masthead">
       <a href="#/" class="name">Sundar Rajan</a>
-      <nav class="menu" aria-label="Menu">
-        <a href="#/work" data-route="work">Work</a>
-        <a href="#/info" data-route="info">Info</a>
-      </nav>
     </header>
 
-    <main id="view"></main>
+    <main>
+      <section id="stage" class="stage" aria-live="polite">
+        <div class="zones"><a data-zone="prev"></a><a data-zone="next"></a></div>
+      </section>
+      <section id="thumbs" class="thumbs" hidden></section>
+    </main>
+
+    <p id="touch-count" class="touch-count" aria-hidden="true"></p>
+
+    <aside id="panel" class="panel" aria-label="Index">
+      <nav class="tabs">
+        <button type="button" data-tab="works">Works</button>
+        <button type="button" data-tab="info">Info</button>
+        <button type="button" class="close" aria-label="Close index" data-cursor="Close">×</button>
+      </nav>
+      <ol id="works" class="works" data-pane="works"></ol>
+      <div id="info" class="info" data-pane="info" hidden></div>
+    </aside>
+
+    <nav class="switch" aria-label="View">
+      <a href="#/" data-view="index">Index</a>
+      <span aria-hidden="true">—</span>
+      <a href="#/thumbnails" data-view="thumbnails">Thumbnails</a>
+    </nav>
 
     <div id="cursor" class="cursor" aria-hidden="true"><span class="dot"></span><span class="label"></span></div>
 
