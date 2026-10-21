@@ -13,6 +13,10 @@
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&display=swap"
     />
     <link rel="stylesheet" href="styles.css" />
+    <!-- Hide text until the serif loads (app.js removes this), so it never swaps fonts on screen. -->
+    <script>
+      document.documentElement.classList.add("fonts-pending");
+    </script>
   </head>
   <body>
     <div id="intro" class="intro" aria-hidden="true"><p id="intro-name" class="intro-name">Sundar Rajan</p></div>
@@ -27,7 +31,7 @@
       <section id="thumbs" class="thumbs" hidden></section>
     </main>
 
-    <p id="touch-count" class="touch-count" aria-hidden="true"></p>
+    <p id="touch-name" class="touch-name" aria-hidden="true"></p>
 
     <aside id="panel" class="panel" aria-label="Index">
       <nav class="tabs">

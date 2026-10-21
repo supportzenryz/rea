@@ -5,7 +5,9 @@
   --rule: #ececec;
   --serif: "Cormorant Garamond", Georgia, serif;
   --panel-w: clamp(290px, 27vw, 400px);
-  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  /* One easing for everything that moves: long, soft landing. */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --glide: 0.9s;
 }
 
 * {
@@ -18,6 +20,13 @@ body {
   height: 100%;
 }
 
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* The page itself never scrolls (Thumbnails scrolls inside its own layer),
+   so a scrollbar can never appear and shift the layout. */
 body {
   background: var(--paper);
   color: var(--ink);
@@ -26,11 +35,8 @@ body {
   font-weight: 400;
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   overflow: hidden;
-}
-
-body.is-thumbs {
-  overflow-y: auto;
 }
 
 a {
@@ -49,9 +55,10 @@ button {
 
 img {
   display: block;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
-.underline,
 .switch a.is-active,
 .tabs .is-active,
 .works a.is-current .title {
@@ -68,8 +75,24 @@ img {
   }
 }
 
-/* Name (top centre) and view switch (bottom centre). Both re-centre in the
-   space left of the panel when it is open. */
+/* Text waits for the serif, then fades in once (no fallback-font swap). */
+.masthead,
+.switch,
+.panel,
+.touch-name {
+  transition: opacity 0.7s ease;
+}
+
+.fonts-pending .masthead,
+.fonts-pending .switch,
+.fonts-pending .panel,
+.fonts-pending .touch-name {
+  opacity: 0;
+}
+
+/* Name (top centre) and view switch (bottom centre). With the panel open
+   they glide left by half its width to stay centred: a transform, not a
+   change of padding, so nothing re-lays out while it moves. */
 
 .masthead,
 .switch {
@@ -80,7 +103,9 @@ img {
   display: flex;
   justify-content: center;
   pointer-events: none;
-  transition: padding-right 0.8s var(--ease);
+  transition:
+    transform var(--glide) var(--ease),
+    opacity 0.7s ease;
 }
 
 .masthead {
@@ -97,7 +122,7 @@ img {
 
 body.panel-open .masthead,
 body.panel-open .switch {
-  padding-right: var(--panel-w);
+  transform: translate3d(calc(var(--panel-w) / -2), 0, 0);
 }
 
 body.is-thumbs .masthead {
@@ -123,21 +148,15 @@ body.is-thumbs .switch {
   color: var(--muted);
 }
 
-/* Stage: one photograph, centred, crossfading to the next. */
+/* Stage: one photograph, centred. Its frame never changes size; opening the
+   panel moves and scales it with a single GPU transform (set in app.js). */
 
 .stage {
   position: fixed;
   inset: 88px 6vw 82px;
-  transition: right 0.8s var(--ease);
-}
-
-body.panel-open .stage {
-  right: calc(var(--panel-w) + 6vw);
-}
-
-.stage[hidden],
-.thumbs[hidden] {
-  display: none;
+  transform-origin: 50% 50%;
+  transition: transform var(--glide) var(--ease);
+  will-change: transform;
 }
 
 .stage img {
@@ -147,15 +166,19 @@ body.panel-open .stage {
   height: 100%;
   object-fit: contain;
   opacity: 0;
-  transition: opacity 1.2s ease;
+  backface-visibility: hidden;
+  /* Arriving: eases in quickly, so it covers the old one early. */
+  transition: opacity var(--fade, 1200ms) cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 .stage img.is-shown {
   opacity: 1;
 }
 
-body.in-project .stage img {
-  transition-duration: 0.45s;
+/* Leaving: holds on, then lets go late, so the change never dips to white. */
+.stage img.is-leaving {
+  opacity: 0;
+  transition: opacity var(--fade, 1200ms) cubic-bezier(0.6, 0, 0.9, 0.35);
 }
 
 .zones {
@@ -166,13 +189,29 @@ body.in-project .stage img {
   grid-template-columns: 1fr 1fr;
 }
 
-/* On touch screens there is no cursor label, so the count sits under the photo. */
-.touch-count {
+/* View change: the stage and the thumbnails crossfade instead of cutting. */
+.view-in {
+  animation: viewIn 0.6s ease both;
+}
+
+.view-out {
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+}
+
+.stage[hidden],
+.thumbs[hidden] {
+  display: none;
+}
+
+/* Touch screens have no cursor label: the project name sits under the photo. */
+.touch-name {
   display: none;
 }
 
 @media (hover: none) {
-  .touch-count {
+  .touch-name {
     display: block;
     position: fixed;
     left: 0;
@@ -199,8 +238,17 @@ body.in-project .stage img {
   background: var(--paper);
   border-left: 1px solid var(--rule);
   overflow-y: auto;
-  transform: translateX(100%);
-  transition: transform 0.8s var(--ease);
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  transform: translate3d(100%, 0, 0);
+  transition:
+    transform var(--glide) var(--ease),
+    opacity 0.7s ease;
+  will-change: transform;
+}
+
+.panel::-webkit-scrollbar {
+  display: none;
 }
 
 body.panel-open .panel {
@@ -215,20 +263,20 @@ body.panel-open .panel {
   font-size: 15px;
 }
 
-.tabs [data-tab]:not(.is-active) {
-  color: var(--ink);
-}
-
 .tabs .close {
   margin-left: auto;
   font-size: 19px;
   line-height: 1;
   color: var(--muted);
-  transition: color 0.2s;
+  transition: color 0.3s ease;
 }
 
 .tabs .close:hover {
   color: var(--ink);
+}
+
+[data-pane] {
+  animation: viewIn 0.5s ease both;
 }
 
 .works {
@@ -238,19 +286,10 @@ body.panel-open .panel {
 }
 
 .works a {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
+  display: block;
   padding: 3px 0;
   font-size: 15.5px;
-  transition: color 0.25s;
-}
-
-.works .count {
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
+  transition: color 0.35s ease;
 }
 
 .works:hover a {
@@ -290,12 +329,22 @@ body.panel-open .panel {
   text-underline-offset: 3px;
 }
 
-/* Thumbnails -------------------------------------------------------------- */
+/* Thumbnails: scrolls inside its own layer, scrollbar hidden. ------------ */
 
 .thumbs {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
   columns: 3;
   column-gap: 7vw;
   padding: 110px 12vw 120px;
+}
+
+.thumbs::-webkit-scrollbar {
+  display: none;
 }
 
 .thumb {
@@ -303,21 +352,21 @@ body.panel-open .panel {
   break-inside: avoid;
   margin: 0 0 8vw;
   opacity: 0;
-  transform: translateY(14px);
+  transform: translate3d(0, 14px, 0);
 }
 
 .thumb.is-in {
-  animation: rise 0.9s var(--ease) forwards;
+  animation: rise 1s var(--ease) forwards;
 }
 
 .thumb img {
   width: 100%;
   height: auto;
-  background: #f2f2f2;
+  background: #f4f4f4;
 }
 
-/* Cursor: a dot and a label in difference blend, light over photographs and
-   dark over the page. */
+/* Cursor: dot and name in difference blend, light over photographs and dark
+   over the page. Invisible until the pointer first moves. */
 
 .cursor {
   position: fixed;
@@ -332,11 +381,17 @@ body.panel-open .panel {
   font-size: 15px;
   white-space: nowrap;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
   will-change: transform;
 }
 
 body.has-cursor .cursor {
   display: flex;
+}
+
+.cursor.is-live {
+  opacity: 1;
 }
 
 .cursor .dot {
@@ -349,7 +404,7 @@ body.has-cursor .cursor {
 
 .cursor .label {
   opacity: 0;
-  transition: opacity 0.25s;
+  transition: opacity 0.3s ease;
 }
 
 .cursor.has-label .label {
@@ -395,6 +450,12 @@ body.has-cursor .cursor {
     filter 3s cubic-bezier(0.45, 0, 0.25, 1);
 }
 
+@keyframes viewIn {
+  from {
+    opacity: 0;
+  }
+}
+
 @keyframes rise {
   to {
     opacity: 1;
@@ -415,7 +476,7 @@ body.has-cursor .cursor {
   }
 }
 
-/* Phones: the panel rises from the bottom; the photo shares the screen. */
+/* Phones: the panel rises from the bottom; the photo glides up above it. */
 
 @media (max-width: 760px) {
   :root {
@@ -432,12 +493,7 @@ body.has-cursor .cursor {
 
   body.panel-open .masthead,
   body.panel-open .switch {
-    padding-right: 16px;
-  }
-
-  body.panel-open .stage {
-    right: 16px;
-    bottom: calc(58vh + 16px);
+    transform: none;
   }
 
   .panel {
@@ -446,7 +502,7 @@ body.has-cursor .cursor {
     padding: 20px 16px 70px;
     border-left: 0;
     border-top: 1px solid var(--rule);
-    transform: translateY(100%);
+    transform: translate3d(0, 100%, 0);
   }
 
   .tabs {

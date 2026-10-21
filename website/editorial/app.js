@@ -1,18 +1,32 @@
 // Routes: #/ (slideshow), #/work/<project>/<n>, #/thumbnails,
 // #/index and #/info (slideshow with the panel open on that tab).
+//
+// Smoothness rules this file follows:
+// - A photograph is decoded off-screen before it appears, and the next one is
+//   prepared ahead, so a change never waits on the network or the decoder.
+// - A new photograph fades in on top while the old one fades out more slowly
+//   beneath it; once the new one is fully in, everything beneath is removed.
+//   Nothing can be left behind, and there is no grey dip mid-change.
+// - Only opacity and transform ever animate (both run on the GPU); nothing
+//   animates size or position through layout.
 
 (() => {
   const LANDING = window.LANDING;
   const PROJECTS = window.PROJECTS;
   const byId = Object.fromEntries(PROJECTS.map((p) => [p.id, p]));
+  const html = document.documentElement;
   const body = document.body;
   const stageEl = document.getElementById("stage");
+  const zonesEl = stageEl.querySelector(".zones");
   const thumbsEl = document.getElementById("thumbs");
+  const panelEl = document.getElementById("panel");
   const worksEl = document.getElementById("works");
   const infoEl = document.getElementById("info");
-  const touchCount = document.getElementById("touch-count");
+  const touchName = document.getElementById("touch-name");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const finePointer = matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+  const FADE = { slide: 1600, step: 700, preview: 550 };
 
   const CONTACT = {
     email: "sundarrajanparamasivan@accademiaitaliana.it",
@@ -27,41 +41,88 @@
 
   const esc = (s) =>
     String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-  const preload = (src) => src && (new Image().src = src);
+  const thumbOf = (src) => src.replace(/^photos\//, "thumbs/");
+  const isOpen = () => body.classList.contains("panel-open");
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  // Stage: shows one photograph and crossfades to the next. Shared by the
-  // slideshow and the projects, so moving between them is one dissolve.
+  // Decode cache --------------------------------------------------------
+  // Holding the decoded Image keeps it ready; a small LRU bounds memory.
 
-  let shownSrc = null;
-  let shownImg = null;
-  const show = (src, alt = "") => {
-    if (shownSrc === src) return;
-    shownSrc = src;
+  const cache = new Map();
+  const prepare = (src) => {
+    if (cache.has(src)) {
+      const hit = cache.get(src);
+      cache.delete(src);
+      cache.set(src, hit);
+      return hit;
+    }
     const img = new Image();
-    img.alt = alt;
     img.decoding = "async";
     img.src = src;
-    stageEl.prepend(img);
-    const prev = shownImg;
-    shownImg = img;
-    const reveal = () => {
-      if (shownImg !== img) return img.remove();
-      img.classList.add("is-shown");
-      if (prev) {
-        prev.classList.remove("is-shown");
-        setTimeout(() => prev.remove(), 1300);
-      }
-    };
-    if (img.complete) requestAnimationFrame(reveal);
-    else img.addEventListener("load", reveal, { once: true });
+    const ready = (img.decode ? img.decode() : new Promise((r) => (img.onload = img.onerror = r)))
+      .catch(() => {})
+      .then(() => img);
+    cache.set(src, ready);
+    while (cache.size > 14) cache.delete(cache.keys().next().value);
+    return ready;
   };
+
+  // Stage ---------------------------------------------------------------
+
+  let shownSrc = null;
+  let shownRatio = 1;
+  let token = 0;
+
+  const show = async (src, { alt = "", r = 0, fade = FADE.step } = {}) => {
+    if (shownSrc === src) return;
+    shownSrc = src;
+    const mine = ++token;
+    const decoded = await prepare(src);
+    if (mine !== token) return; // a newer change has already been asked for
+
+    const el = decoded.cloneNode();
+    el.alt = alt;
+    shownRatio = r || decoded.naturalWidth / decoded.naturalHeight || 1;
+    const below = [...stageEl.querySelectorAll("img")];
+    stageEl.style.setProperty("--fade", `${reduced ? 1 : fade}ms`);
+    stageEl.insertBefore(el, zonesEl);
+    fitStage();
+
+    // Next frame: start both fades together.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        el.classList.add("is-shown");
+        below.forEach((b) => b.classList.replace("is-shown", "is-leaving") || b.classList.add("is-leaving"));
+      }),
+    );
+    // Once the new photograph is fully in, clear everything beneath it.
+    setTimeout(() => below.forEach((b) => b.remove()), (reduced ? 1 : fade) + 80);
+  };
+
+  // With the panel open, the photograph glides and scales (one transform) to
+  // stay centred in the space beside or above the panel.
+  const fitStage = () => {
+    if (!isOpen() || stageEl.hidden) {
+      stageEl.style.transform = "";
+      return;
+    }
+    const R = { l: stageEl.offsetLeft, t: stageEl.offsetTop, w: stageEl.offsetWidth, h: stageEl.offsetHeight };
+    const phone = innerWidth <= 760;
+    const T = phone
+      ? { l: R.l, t: R.t, w: R.w, h: innerHeight - panelEl.offsetHeight - 16 - R.t }
+      : { l: R.l, t: R.t, w: innerWidth - panelEl.offsetWidth - innerWidth * 0.06 - R.l, h: R.h };
+    const fitW = (w, h) => (w / h > shownRatio ? h * shownRatio : w);
+    const s = Math.min(1, fitW(T.w, T.h) / fitW(R.w, R.h));
+    const dx = T.l + T.w / 2 - (R.l + R.w / 2);
+    const dy = T.t + T.h / 2 - (R.t + R.h / 2);
+    stageEl.style.transform = `translate3d(${dx.toFixed(1)}px, ${dy.toFixed(1)}px, 0) scale(${s.toFixed(4)})`;
+  };
+  addEventListener("resize", fitStage);
 
   // Panel ---------------------------------------------------------------
 
   worksEl.innerHTML = PROJECTS.map(
-    (p) =>
-      `<li><a href="#/work/${p.id}/1" data-id="${p.id}">` +
-      `<span class="title">${esc(p.title)}</span><span class="count">${p.photos.length}</span></a></li>`,
+    (p) => `<li><a href="#/work/${p.id}/1" data-id="${p.id}"><span class="title">${esc(p.title)}</span></a></li>`,
   ).join("");
 
   infoEl.innerHTML =
@@ -72,6 +133,9 @@
     `<dt>Based</dt><dd>${esc(CONTACT.based)}</dd>` +
     `</dl>`;
 
+  // Covers are decoded ahead so hover previews are instant.
+  const warmCovers = () => PROJECTS.forEach((p) => prepare(p.photos[0].src));
+
   const setTab = (tab) => {
     document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("is-active", b.dataset.tab === tab));
     document.querySelectorAll("[data-pane]").forEach((p) => (p.hidden = p.dataset.pane !== tab));
@@ -79,30 +143,46 @@
   const openPanel = (tab = "works") => {
     setTab(tab);
     body.classList.add("panel-open");
+    warmCovers();
+    fitStage();
     markSwitch();
   };
   const closePanel = () => {
     body.classList.remove("panel-open");
+    if (!stageEl.hidden) showCurrent(); // drop any hover preview
+    fitStage();
     markSwitch();
   };
 
   document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
-  document.querySelector(".tabs .close").addEventListener("click", closePanel);
+  panelEl.querySelector(".close").addEventListener("click", closePanel);
 
-  // Hovering a project previews its cover; leaving the list restores the view.
+  // Hover previews wait a beat, so skimming the list does not flicker.
+  let hoverTimer = 0;
   worksEl.addEventListener("pointerover", (e) => {
     const a = e.target.closest("a[data-id]");
-    if (a && !stageEl.hidden) show(byId[a.dataset.id].photos[0].src);
+    if (!a || stageEl.hidden) return;
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(() => {
+      const ph = byId[a.dataset.id].photos[0];
+      show(ph.src, { r: ph.r, fade: FADE.preview });
+    }, 90);
   });
-  worksEl.addEventListener("pointerleave", () => !stageEl.hidden && showCurrent());
-  worksEl.addEventListener("click", () => body.classList.remove("panel-open"));
+  worksEl.addEventListener("pointerleave", () => {
+    clearTimeout(hoverTimer);
+    if (!stageEl.hidden) hoverTimer = setTimeout(showCurrent, 90);
+  });
+  worksEl.addEventListener("click", () => {
+    clearTimeout(hoverTimer);
+    body.classList.remove("panel-open");
+    markSwitch();
+  });
 
   // Index — Thumbnails ----------------------------------------------------
 
   const markSwitch = () => {
-    const thumbs = route().name === "thumbnails";
-    document.querySelector('[data-view="index"]').classList.toggle("is-active", body.classList.contains("panel-open"));
-    document.querySelector('[data-view="thumbnails"]').classList.toggle("is-active", thumbs);
+    document.querySelector('[data-view="index"]').classList.toggle("is-active", isOpen());
+    document.querySelector('[data-view="thumbnails"]').classList.toggle("is-active", route().name === "thumbnails");
   };
 
   let lastStageHash = "#/";
@@ -110,27 +190,32 @@
     e.preventDefault();
     if (route().name === "thumbnails") {
       location.hash = lastStageHash;
-      requestAnimationFrame(() => openPanel("works"));
-    } else if (body.classList.contains("panel-open")) closePanel();
+      setTimeout(() => openPanel("works"), 120);
+    } else if (isOpen()) closePanel();
     else openPanel("works");
   });
 
   // Slideshow -----------------------------------------------------------
 
   let slide = 0;
-  let slideTimer = null;
+  let slideTimer = 0;
   let introPlaying = false;
 
-  const showSlide = (i) => {
+  const showSlide = async (i) => {
     slide = (i + LANDING.length) % LANDING.length;
-    show(LANDING[slide].src);
-    preload(LANDING[(slide + 1) % LANDING.length].src);
-    label(`${slide + 1}/${LANDING.length}`);
+    const s = LANDING[slide];
+    setLabel(null);
+    await show(s.src, { r: s.r, fade: FADE.slide });
+    prepare(LANDING[(slide + 1) % LANDING.length].src);
+    schedule();
+  };
+  const schedule = () => {
     clearTimeout(slideTimer);
-    if (!reduced) slideTimer = setTimeout(function next() {
-      if (introPlaying || route().name !== "landing") return (slideTimer = setTimeout(next, 1000));
+    if (reduced) return;
+    slideTimer = setTimeout(function next() {
+      if (introPlaying || isOpen() || route().name !== "landing") return (slideTimer = setTimeout(next, 1200));
       showSlide(slide + 1);
-    }, 5200);
+    }, 5600);
   };
 
   // Projects ------------------------------------------------------------
@@ -150,26 +235,43 @@
     const total = p.photos.length;
     n = Math.min(Math.max(n, 1), total);
     viewing = { p, n, total };
-    show(p.photos[n - 1].src, `${p.title}, ${n} of ${total}`);
-    preload(p.photos[n] && p.photos[n].src);
-    label(`${p.title} — ${n}/${total}`);
+    const ph = p.photos[n - 1];
+    setLabel(p.title);
+    show(ph.src, { alt: p.title, r: ph.r, fade: FADE.step });
+    // Prepare both neighbours so stepping either way is instant.
+    const next = p.photos[n] || PROJECTS[(PROJECTS.indexOf(p) + 1) % PROJECTS.length].photos[0];
+    prepare(next.src);
+    if (p.photos[n - 2]) prepare(p.photos[n - 2].src);
     worksEl.querySelectorAll("a").forEach((a) => a.classList.toggle("is-current", a.dataset.id === p.id));
     document.title = `${p.title} — Sundar Rajan`;
   };
 
   const showCurrent = () => {
-    if (viewing) show(viewing.p.photos[viewing.n - 1].src);
-    else show(LANDING[slide].src);
+    if (viewing) {
+      const ph = viewing.p.photos[viewing.n - 1];
+      show(ph.src, { alt: viewing.p.title, r: ph.r, fade: FADE.preview });
+    } else {
+      const s = LANDING[slide];
+      show(s.src, { r: s.r, fade: FADE.preview });
+    }
   };
 
-  // Cursor labels for the two halves of the photograph, and the touch count.
-  const [zonePrev, zoneNext] = stageEl.querySelectorAll(".zones a");
-  function label(text) {
-    zonePrev.dataset.cursor = `‹ ${text}`;
-    zoneNext.dataset.cursor = `${text} ›`;
-    touchCount.textContent = text.replace("/", " / ");
+  // Names only: the cursor shows the project name (just the dot on the
+  // slideshow), and touch screens show the name under the photograph.
+  const [zonePrev, zoneNext] = zonesEl.querySelectorAll("a");
+  function setLabel(name) {
+    if (name) {
+      zonePrev.dataset.cursor = name;
+      zoneNext.dataset.cursor = name;
+    } else {
+      delete zonePrev.dataset.cursor;
+      delete zoneNext.dataset.cursor;
+    }
+    touchName.textContent = name || "";
     refreshCursor();
   }
+  zonePrev.setAttribute("aria-label", "Previous photograph");
+  zoneNext.setAttribute("aria-label", "Next photograph");
 
   const step = (d) => {
     if (viewing) location.hash = projectHref(viewing.p, viewing.n + d);
@@ -178,16 +280,15 @@
   // With the panel open, a click on the photograph only closes the panel.
   const onZone = (d) => (e) => {
     e.preventDefault();
-    if (body.classList.contains("panel-open")) closePanel();
+    if (isOpen()) closePanel();
     else step(d);
   };
   zonePrev.addEventListener("click", onZone(-1));
   zoneNext.addEventListener("click", onZone(1));
 
-  // Any other click outside the panel closes it too, so without a click
-  // there is nothing on screen but the photographs.
+  // Any other click outside the panel closes it too.
   document.addEventListener("click", (e) => {
-    if (!body.classList.contains("panel-open")) return;
+    if (!isOpen()) return;
     if (e.target.closest("#panel, [data-view='index'], .zones")) return;
     closePanel();
   });
@@ -205,16 +306,38 @@
           e.target.classList.add("is-in");
           io.unobserve(e.target);
         }),
-      { rootMargin: "0px 0px -5% 0px" },
+      { root: thumbsEl, rootMargin: "0px 0px -4% 0px" },
     );
     thumbsEl.innerHTML = PROJECTS.flatMap((p) =>
       p.photos.map(
         (ph, i) =>
-          `<a class="thumb" href="#/work/${p.id}/${i + 1}" data-cursor="${esc(p.title)} — ${i + 1}/${p.photos.length}">` +
-          `<img src="${ph.src}" alt="${esc(p.title)}, ${i + 1} of ${p.photos.length}" loading="lazy" decoding="async" style="aspect-ratio:${ph.r}" /></a>`,
+          `<a class="thumb" href="#/work/${p.id}/${i + 1}" data-cursor="${esc(p.title)}">` +
+          `<img src="${thumbOf(ph.src)}" alt="${esc(p.title)}" loading="lazy" decoding="async" style="aspect-ratio:${ph.r}" /></a>`,
       ),
     ).join("");
     thumbsEl.querySelectorAll(".thumb").forEach((t) => io.observe(t));
+  };
+
+  // Crossfade between the stage and the thumbnails instead of cutting.
+  let viewToken = 0;
+  let thumbsScroll = 0;
+  const swapView = (toThumbs) => {
+    const incoming = toThumbs ? thumbsEl : stageEl;
+    const outgoing = toThumbs ? stageEl : thumbsEl;
+    if (!incoming.hidden && !incoming.classList.contains("view-out")) return;
+    const mine = ++viewToken;
+    if (outgoing === thumbsEl && !thumbsEl.hidden) thumbsScroll = thumbsEl.scrollTop;
+    incoming.classList.remove("view-out");
+    incoming.hidden = false;
+    if (incoming === thumbsEl) thumbsEl.scrollTop = thumbsScroll;
+    incoming.classList.add("view-in");
+    outgoing.classList.add("view-out");
+    setTimeout(() => {
+      if (mine !== viewToken) return;
+      outgoing.hidden = true;
+      outgoing.classList.remove("view-out");
+      incoming.classList.remove("view-in");
+    }, reduced ? 0 : 520);
   };
 
   // Router --------------------------------------------------------------
@@ -229,17 +352,18 @@
   const render = () => {
     const r = route();
     const thumbs = r.name === "thumbnails";
-    body.classList.toggle("is-thumbs", thumbs);
     body.classList.toggle("in-project", r.name === "project");
-    stageEl.hidden = thumbs;
-    thumbsEl.hidden = !thumbs;
+    body.classList.toggle("is-thumbs", thumbs);
     document.title = "Sundar Rajan";
+    swapView(thumbs);
 
     if (thumbs) {
-      body.classList.remove("panel-open");
+      if (isOpen()) {
+        body.classList.remove("panel-open");
+        fitStage();
+      }
       buildThumbs();
-      window.scrollTo(0, 0);
-      touchCount.textContent = "";
+      touchName.textContent = "";
     } else {
       lastStageHash = location.hash || "#/";
       if (r.name === "project") showProject(r.p, r.n);
@@ -259,20 +383,22 @@
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      if (body.classList.contains("panel-open")) closePanel();
+      if (isOpen()) closePanel();
       else if (route().name !== "landing") location.hash = "#/";
       return;
     }
-    if (stageEl.hidden) return;
+    if (stageEl.hidden || isOpen()) return;
     if (e.key === "ArrowRight") step(1);
     if (e.key === "ArrowLeft") step(-1);
   });
 
   // Cursor --------------------------------------------------------------
+  // Hidden until the pointer first moves (so it never jumps in from the
+  // centre), then eased with a frame-rate independent follow.
 
   const cursor = document.getElementById("cursor");
   const cursorLabel = cursor.querySelector(".label");
-  const pos = { x: innerWidth / 2, y: innerHeight / 2 };
+  const pos = { x: -100, y: -100 };
   const drawn = { ...pos };
   let lastTarget = null;
 
@@ -287,14 +413,22 @@
 
   if (finePointer) {
     body.classList.add("has-cursor");
+    let seenPointer = false;
     document.addEventListener("pointermove", (e) => {
       pos.x = e.clientX;
       pos.y = e.clientY;
+      if (!seenPointer) {
+        seenPointer = true;
+        drawn.x = pos.x;
+        drawn.y = pos.y;
+        cursor.classList.add("is-live");
+      }
       lastTarget = e.target;
       refreshCursor();
     });
-    document.addEventListener("pointerleave", () => cursor.classList.remove("has-label"));
-    addEventListener(
+    document.addEventListener("pointerleave", () => cursor.classList.remove("is-live", "has-label"));
+    document.addEventListener("pointerenter", () => seenPointer && cursor.classList.add("is-live"));
+    thumbsEl.addEventListener(
       "scroll",
       () => {
         lastTarget = null;
@@ -302,15 +436,27 @@
       },
       { passive: true },
     );
-    const loop = () => {
-      const k = reduced ? 1 : 0.22;
+    let prev = performance.now();
+    const loop = (now) => {
+      const dt = Math.min(64, now - prev);
+      prev = now;
+      const k = reduced ? 1 : 1 - Math.pow(1 - 0.22, dt / 16.67);
       drawn.x += (pos.x - drawn.x) * k;
       drawn.y += (pos.y - drawn.y) * k;
-      cursor.style.transform = `translate(${drawn.x}px, ${drawn.y}px) translateY(-50%)`;
+      cursor.style.transform = `translate3d(${drawn.x.toFixed(2)}px, ${drawn.y.toFixed(2)}px, 0) translateY(-50%)`;
       requestAnimationFrame(loop);
     };
-    loop();
+    requestAnimationFrame(loop);
   }
+
+  // Fonts: text stays hidden until the serif is ready (at most 1.5 s), then
+  // fades in once, so it never swaps from a fallback face.
+
+  const fontsReady = Promise.race([
+    document.fonts ? document.fonts.load('400 16px "Cormorant Garamond"') : Promise.resolve(),
+    wait(1500),
+  ]).catch(() => {});
+  fontsReady.then(() => html.classList.remove("fonts-pending"));
 
   // Opening: the name fades in alone, holds, then softly dissolves in place
   // while the page clears to the slideshow.
@@ -323,6 +469,7 @@
   } catch {}
   const play = !reduced && (/[?&]intro\b/.test(location.search) || !seen) && route().name === "landing";
 
+  thumbsEl.hidden = true;
   render();
 
   if (!play) {
@@ -339,31 +486,23 @@
       setTimeout(() => {
         intro.remove();
         introPlaying = false;
-        if (route().name === "landing") showSlide(slide); // the first slide gets its full time
+        if (route().name === "landing") schedule(); // the first slide gets its full time
       }, 1700);
       try {
         sessionStorage.setItem("sr-intro", "1");
       } catch {}
     };
 
-    // Dissolve: the name softens and fades in place over 3 s; part-way
-    // through, the page starts clearing to the slideshow.
     const dissolve = () => {
       nameEl.classList.add("is-dissolving");
       revealTimer = setTimeout(reveal, 1800);
     };
 
-    requestAnimationFrame(() => requestAnimationFrame(() => intro.classList.add("is-in")));
-    const first = new Image();
-    first.src = LANDING[0].src;
-    const loaded = new Promise((r) => {
-      if (first.complete) r();
-      first.onload = first.onerror = r;
-    });
+    fontsReady.then(() => requestAnimationFrame(() => intro.classList.add("is-in")));
     // Hold the name (and wait for the first photograph) before it dissolves.
     Promise.race([
-      Promise.all([loaded, new Promise((r) => setTimeout(r, 3400))]),
-      new Promise((r) => setTimeout(r, 7000)),
+      Promise.all([prepare(LANDING[0].src), fontsReady.then(() => wait(3400))]),
+      wait(7000),
     ]).then(dissolve);
     intro.addEventListener("click", reveal);
     addEventListener("keydown", reveal, { once: true });
