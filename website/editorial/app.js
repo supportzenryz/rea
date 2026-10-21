@@ -9,10 +9,9 @@
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const finePointer = matchMedia("(hover: hover) and (pointer: fine)").matches;
 
-  // Placeholders until the real details arrive.
   const CONTACT = {
-    email: "hello@example.com",
-    instagram: { label: "Instagram", href: "#" },
+    email: "sundarrajanparamasivan@accademiaitaliana.it",
+    instagram: { label: "@photosbysundar", href: "https://www.instagram.com/photosbysundar/" },
     based: "India — Europe",
   };
 

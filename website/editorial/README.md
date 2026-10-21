@@ -17,7 +17,6 @@ once per visit; add `?intro` to the URL to see it again.
 
 - `data.js` lists every photograph and its ratio. It is generated from the
   files in `photos/`; regenerate it after adding or removing photographs.
-- `app.js` holds the bio and the contact details (`CONTACT`). **The email and
-  Instagram link are placeholders.**
+- `app.js` holds the bio and the contact details (`CONTACT`).
 - Photographs come from the "Website - Materials" Drive folder, resized to
   2000px (landing) and 1800px (projects).
