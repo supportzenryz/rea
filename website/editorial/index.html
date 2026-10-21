@@ -1,63 +1,28 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Maison Vérane — Studio de photographie, Paris</title>
-    <meta
-      name="description"
-      content="Maison Vérane, studio de photographie de mode à Paris : éditoriaux, campagnes et portraits."
-    />
-    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <title>Sundar Rajan</title>
+    <meta name="description" content="Sundar Rajan, fashion photographer working between India and Europe." />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@400;500&display=swap"
-    />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400&display=swap" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div id="intro" class="intro" aria-hidden="true">
-      <div class="intro-bg"></div>
-      <div id="intro-stage" class="intro-stage"></div>
-      <p id="intro-name" class="intro-name">Maison Vérane</p>
-      <p class="intro-label">Studio de photographie — Paris</p>
-      <p class="intro-count"><span id="intro-count">000</span></p>
-      <span id="intro-bar" class="intro-bar"></span>
-    </div>
-
-    <!-- Liquid smudge for the last intro frame: turbulence drives a displacement
-         whose strength app.js eases down to zero. -->
-    <svg class="defs" width="0" height="0" aria-hidden="true" focusable="false">
-      <filter id="smudge" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">
-        <feTurbulence type="fractalNoise" baseFrequency="0.006 0.034" numOctaves="2" seed="7" result="noise" />
-        <feDisplacementMap id="smudge-map" in="SourceGraphic" in2="noise" scale="0" xChannelSelector="R" yChannelSelector="G" />
-      </filter>
-    </svg>
+    <div id="intro" class="intro" aria-hidden="true"><p class="intro-name">Sundar Rajan</p></div>
 
     <header class="top">
-      <a href="#/" class="wordmark" data-cursor-text="index">Maison Vérane</a>
+      <a href="#/" class="name">Sundar Rajan</a>
       <nav class="menu" aria-label="Menu">
-        <a href="#/" data-route="index" data-i18n="nav.work">Travaux</a>
-        <a href="#/studio" data-route="studio" data-i18n="nav.studio">Studio</a>
-        <a href="#/contact" data-route="contact" data-i18n="nav.contact">Contact</a>
-        <span class="lang" role="group" aria-label="Langue">
-          <button type="button" data-lang="fr">FR</button><span aria-hidden="true">/</span><button type="button" data-lang="en">EN</button>
-        </span>
+        <a href="#/work" data-route="work">Work</a>
+        <a href="#/info" data-route="info">Info</a>
       </nav>
     </header>
 
     <main id="view"></main>
-
-    <footer class="bottom">
-      <p class="clock"><span data-i18n="clock.city">Paris</span> <span id="clock">--:--</span></p>
-      <nav class="switch" aria-label="Affichage">
-        <a href="#/" data-route="index" data-i18n="view.index">Index</a>
-        <span aria-hidden="true">—</span>
-        <a href="#/grille" data-route="grid" data-i18n="view.grid">Grille</a>
-      </nav>
-    </footer>
 
     <div id="cursor" class="cursor" aria-hidden="true"><span class="dot"></span><span class="label"></span></div>
 
