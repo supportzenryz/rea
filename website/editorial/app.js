@@ -79,7 +79,10 @@
   let token = 0;
 
   const show = async (src, { alt = "", r = 0, fade = FADE.step } = {}) => {
-    if (shownSrc === src) return;
+    if (shownSrc === src) {
+      fitStage(); // same photograph, but the panel may have opened or closed
+      return;
+    }
     shownSrc = src;
     const mine = ++token;
     const decoded = await prepare(src);
@@ -190,6 +193,7 @@
     clearTimeout(hoverTimer);
     cameFrom = "index";
     body.classList.remove("panel-open");
+    fitStage(); // glide the photograph back to the centre with the panel
     markSwitch();
   });
 
