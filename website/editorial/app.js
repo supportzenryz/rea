@@ -175,8 +175,22 @@
     if (viewing) location.hash = projectHref(viewing.p, viewing.n + d);
     else showSlide(slide + d);
   };
-  zonePrev.addEventListener("click", (e) => (e.preventDefault(), step(-1)));
-  zoneNext.addEventListener("click", (e) => (e.preventDefault(), step(1)));
+  // With the panel open, a click on the photograph only closes the panel.
+  const onZone = (d) => (e) => {
+    e.preventDefault();
+    if (body.classList.contains("panel-open")) closePanel();
+    else step(d);
+  };
+  zonePrev.addEventListener("click", onZone(-1));
+  zoneNext.addEventListener("click", onZone(1));
+
+  // Any other click outside the panel closes it too, so without a click
+  // there is nothing on screen but the photographs.
+  document.addEventListener("click", (e) => {
+    if (!body.classList.contains("panel-open")) return;
+    if (e.target.closest("#panel, [data-view='index'], .zones")) return;
+    closePanel();
+  });
 
   // Thumbnails ------------------------------------------------------------
 
@@ -298,7 +312,8 @@
     loop();
   }
 
-  // Opening: the name alone, then the page clears to the first photograph.
+  // Opening: the name fades in alone, then slowly smudges away (smearing
+  // sideways as it melts) while the page clears to the slideshow.
   // Once per visit; add ?intro to the URL to see it again.
 
   const intro = document.getElementById("intro");
@@ -314,17 +329,45 @@
     intro.remove();
   } else {
     introPlaying = true;
-    const end = () => {
+    const nameEl = document.getElementById("intro-name");
+    const map = document.getElementById("smudge-map");
+    let raf = 0;
+
+    const reveal = () => {
       if (intro.classList.contains("is-out")) return;
       intro.classList.add("is-out");
       setTimeout(() => {
+        cancelAnimationFrame(raf);
         intro.remove();
         introPlaying = false;
+        if (route().name === "landing") showSlide(slide); // the first slide gets its full time
       }, 1700);
       try {
         sessionStorage.setItem("sr-intro", "1");
       } catch {}
     };
+
+    // Smudge: the displacement, blur and letter spacing grow while the name
+    // fades; halfway through, the page starts clearing to the slideshow.
+    const smudge = () => {
+      const D = 2400;
+      const start = performance.now();
+      const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+      nameEl.classList.add("is-smudging");
+      const frame = (now) => {
+        const t = Math.min(1, (now - start) / D);
+        const e = ease(t);
+        map.setAttribute("scale", (18 * e).toFixed(2));
+        nameEl.style.filter = `url(#smudge) blur(${(3.2 * e).toFixed(2)}px)`;
+        nameEl.style.letterSpacing = `${(0.14 + 0.16 * e).toFixed(3)}em`;
+        nameEl.style.transform = `scaleX(${(1 + 0.12 * e).toFixed(3)})`;
+        nameEl.style.opacity = (1 - e).toFixed(3);
+        if (t > 0.45) reveal();
+        if (t < 1) raf = requestAnimationFrame(frame);
+      };
+      raf = requestAnimationFrame(frame);
+    };
+
     requestAnimationFrame(() => requestAnimationFrame(() => intro.classList.add("is-in")));
     const first = new Image();
     first.src = LANDING[0].src;
@@ -332,11 +375,12 @@
       if (first.complete) r();
       first.onload = first.onerror = r;
     });
+    // Hold the name for a moment (and until the first photograph is ready).
     Promise.race([
-      Promise.all([loaded, new Promise((r) => setTimeout(r, 2200))]),
+      Promise.all([loaded, new Promise((r) => setTimeout(r, 2000))]),
       new Promise((r) => setTimeout(r, 6000)),
-    ]).then(end);
-    intro.addEventListener("click", end);
-    addEventListener("keydown", end, { once: true });
+    ]).then(smudge);
+    intro.addEventListener("click", reveal);
+    addEventListener("keydown", reveal, { once: true });
   }
 })();

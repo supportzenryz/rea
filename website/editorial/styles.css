@@ -386,9 +386,16 @@ body.has-cursor .cursor {
   opacity: 1;
 }
 
-.intro.is-out .intro-name {
-  opacity: 0;
-  transition-duration: 0.8s;
+/* While the name smudges, app.js drives its filter, spacing and opacity. */
+.intro-name.is-smudging {
+  transition: none;
+  will-change: filter, opacity, transform;
+}
+
+.defs {
+  position: absolute;
+  width: 0;
+  height: 0;
 }
 
 @keyframes rise {
