@@ -379,23 +379,20 @@ body.has-cursor .cursor {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   opacity: 0;
-  transition: opacity 1.2s ease;
+  transition: opacity 1.6s ease;
 }
 
 .intro.is-in .intro-name {
   opacity: 1;
 }
 
-/* While the name smudges, app.js drives its filter, spacing and opacity. */
-.intro-name.is-smudging {
-  transition: none;
-  will-change: filter, opacity, transform;
-}
-
-.defs {
-  position: absolute;
-  width: 0;
-  height: 0;
+/* The name softens and fades in place: no movement, just a slow dissolve. */
+.intro.is-in .intro-name.is-dissolving {
+  opacity: 0;
+  filter: blur(7px);
+  transition:
+    opacity 3s cubic-bezier(0.45, 0, 0.25, 1),
+    filter 3s cubic-bezier(0.45, 0, 0.25, 1);
 }
 
 @keyframes rise {

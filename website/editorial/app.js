@@ -312,8 +312,8 @@
     loop();
   }
 
-  // Opening: the name fades in alone, then slowly smudges away (smearing
-  // sideways as it melts) while the page clears to the slideshow.
+  // Opening: the name fades in alone, holds, then softly dissolves in place
+  // while the page clears to the slideshow.
   // Once per visit; add ?intro to the URL to see it again.
 
   const intro = document.getElementById("intro");
@@ -330,14 +330,13 @@
   } else {
     introPlaying = true;
     const nameEl = document.getElementById("intro-name");
-    const map = document.getElementById("smudge-map");
-    let raf = 0;
+    let revealTimer = 0;
 
     const reveal = () => {
       if (intro.classList.contains("is-out")) return;
+      clearTimeout(revealTimer);
       intro.classList.add("is-out");
       setTimeout(() => {
-        cancelAnimationFrame(raf);
         intro.remove();
         introPlaying = false;
         if (route().name === "landing") showSlide(slide); // the first slide gets its full time
@@ -347,25 +346,11 @@
       } catch {}
     };
 
-    // Smudge: the displacement, blur and letter spacing grow while the name
-    // fades; halfway through, the page starts clearing to the slideshow.
-    const smudge = () => {
-      const D = 2400;
-      const start = performance.now();
-      const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-      nameEl.classList.add("is-smudging");
-      const frame = (now) => {
-        const t = Math.min(1, (now - start) / D);
-        const e = ease(t);
-        map.setAttribute("scale", (18 * e).toFixed(2));
-        nameEl.style.filter = `url(#smudge) blur(${(3.2 * e).toFixed(2)}px)`;
-        nameEl.style.letterSpacing = `${(0.14 + 0.16 * e).toFixed(3)}em`;
-        nameEl.style.transform = `scaleX(${(1 + 0.12 * e).toFixed(3)})`;
-        nameEl.style.opacity = (1 - e).toFixed(3);
-        if (t > 0.45) reveal();
-        if (t < 1) raf = requestAnimationFrame(frame);
-      };
-      raf = requestAnimationFrame(frame);
+    // Dissolve: the name softens and fades in place over 3 s; part-way
+    // through, the page starts clearing to the slideshow.
+    const dissolve = () => {
+      nameEl.classList.add("is-dissolving");
+      revealTimer = setTimeout(reveal, 1800);
     };
 
     requestAnimationFrame(() => requestAnimationFrame(() => intro.classList.add("is-in")));
@@ -375,11 +360,11 @@
       if (first.complete) r();
       first.onload = first.onerror = r;
     });
-    // Hold the name for a moment (and until the first photograph is ready).
+    // Hold the name (and wait for the first photograph) before it dissolves.
     Promise.race([
-      Promise.all([loaded, new Promise((r) => setTimeout(r, 2000))]),
-      new Promise((r) => setTimeout(r, 6000)),
-    ]).then(smudge);
+      Promise.all([loaded, new Promise((r) => setTimeout(r, 3400))]),
+      new Promise((r) => setTimeout(r, 7000)),
+    ]).then(dissolve);
     intro.addEventListener("click", reveal);
     addEventListener("keydown", reveal, { once: true });
   }
