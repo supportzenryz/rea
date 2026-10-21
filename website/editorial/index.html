@@ -3,32 +3,63 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sundar Rajan</title>
-    <meta name="description" content="Sundar Rajan, fashion photographer working between India and Europe." />
-    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <title>Sundar Rajan — Fashion Photographer, India &amp; Europe</title>
+    <meta
+      name="description"
+      content="Sundar Rajan is a fashion photographer working between India and Europe, using clothing to express identity, emotion and the complexities of being human."
+    />
+    <meta name="author" content="Sundar Rajan" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+
+    <!-- Sharing. The Worker adds the absolute URLs (canonical, og:url, images)
+         for whichever domain the site is served from. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Sundar Rajan" />
+    <meta property="og:title" content="Sundar Rajan — Fashion Photographer" />
+    <meta
+      property="og:description"
+      content="Fashion photography between India and Europe: identity, emotion and the worlds people inhabit and imagine."
+    />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:image:width" content="2000" />
+    <meta property="og:image:height" content="1714" />
+    <meta property="og:image:alt" content="A man carries a woman in a white gown through a lit doorway in a dark room." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Sundar Rajan — Fashion Photographer" />
+    <meta
+      name="twitter:description"
+      content="Fashion photography between India and Europe: identity, emotion and the worlds people inhabit and imagine."
+    />
+    <!--seo-->
+
+    <link rel="preload" as="image" href="/photos/landing/01.jpg" fetchpriority="high" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&display=swap"
     />
-    <link rel="stylesheet" href="styles.css" />
-    <!-- Hide text until the serif loads (app.js removes this), so it never swaps fonts on screen. -->
-    <script>
-      document.documentElement.classList.add("fonts-pending");
-    </script>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/boot.js"></script>
   </head>
   <body>
     <div id="intro" class="intro" aria-hidden="true"><p id="intro-name" class="intro-name">Sundar Rajan</p></div>
+
     <header class="masthead">
-      <a href="#/" class="name">Sundar Rajan</a>
+      <h1 class="name"><a href="#/">Sundar Rajan</a></h1>
     </header>
 
+    <a id="back" class="back" href="#/" hidden>← Back</a>
+
     <main>
-      <section id="stage" class="stage" aria-live="polite">
+      <section id="stage" class="stage" aria-label="Photograph" aria-live="polite">
         <div class="zones"><a data-zone="prev"></a><a data-zone="next"></a></div>
       </section>
-      <section id="thumbs" class="thumbs" hidden></section>
+      <button id="arrow-prev" class="arrow prev" type="button" aria-label="Previous photograph">‹</button>
+      <button id="arrow-next" class="arrow next" type="button" aria-label="Next photograph">›</button>
+      <section id="thumbs" class="thumbs" aria-label="All photographs" hidden></section>
     </main>
 
     <p id="touch-name" class="touch-name" aria-hidden="true"></p>
@@ -37,10 +68,33 @@
       <nav class="tabs">
         <button type="button" data-tab="works">Works</button>
         <button type="button" data-tab="info">Info</button>
+        <button type="button" data-tab="contact">Contact</button>
         <button type="button" class="close" aria-label="Close index" data-cursor="Close">×</button>
       </nav>
       <ol id="works" class="works" data-pane="works"></ol>
       <div id="info" class="info" data-pane="info" hidden></div>
+      <div id="contact" class="contact" data-pane="contact" hidden>
+        <h2>Get in touch</h2>
+        <p class="lede">For commissions, editorials and collaborations.</p>
+        <form id="enquiry" class="enquiry" novalidate>
+          <label>Name<input name="name" type="text" autocomplete="name" maxlength="120" required /></label>
+          <label>Email<input name="email" type="email" autocomplete="email" maxlength="200" required /></label>
+          <label
+            >Enquiry
+            <select name="type">
+              <option>Commission</option>
+              <option>Editorial</option>
+              <option>Collaboration</option>
+              <option>Other</option>
+            </select>
+          </label>
+          <label>Message<textarea name="message" rows="6" maxlength="4000" required></textarea></label>
+          <!-- Left empty by people; bots fill it in. -->
+          <label class="trap" aria-hidden="true">Website<input name="website" type="text" tabindex="-1" autocomplete="off" /></label>
+          <button type="submit">Send</button>
+          <p class="status" role="status" aria-live="polite"></p>
+        </form>
+      </div>
     </aside>
 
     <nav class="switch" aria-label="View">
@@ -51,7 +105,25 @@
 
     <div id="cursor" class="cursor" aria-hidden="true"><span class="dot"></span><span class="label"></span></div>
 
-    <script src="data.js"></script>
-    <script src="app.js"></script>
+    <noscript>
+      <div class="noscript">
+        <p>
+          Sundar Rajan is a fashion photographer working between India and Europe. His work explores the
+          relationship between fashion and the human experience, using clothing as a means of expressing
+          identity, emotion and the complexities of being human.
+        </p>
+        <p>
+          Projects: Cold, Elsewhere, Erode Clothing AW 25, Sleeeep, Still Here, Taste of Routine, Unarmoured,
+          Unmasked.
+        </p>
+        <p>
+          Email: <a href="mailto:sundarrajanparamasivan@accademiaitaliana.it">sundarrajanparamasivan@accademiaitaliana.it</a>
+          — Instagram: <a href="https://www.instagram.com/photosbysundar/">@photosbysundar</a>
+        </p>
+      </div>
+    </noscript>
+
+    <script src="/data.js"></script>
+    <script src="/app.js"></script>
   </body>
 </html>

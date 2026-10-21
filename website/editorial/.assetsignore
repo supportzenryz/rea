@@ -1,2 +1,6 @@
+src
+wrangler.jsonc
+dev.mjs
 README.md
+.wrangler
 .assetsignore

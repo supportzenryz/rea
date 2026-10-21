@@ -139,9 +139,69 @@ body.is-thumbs .switch {
 }
 
 .name {
+  margin: 0;
   font-size: 15px;
+  font-weight: 400;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+/* Back (inside a project) and the step arrows. */
+
+.back {
+  position: fixed;
+  top: 24px;
+  left: 28px;
+  z-index: 21;
+  font-size: 15px;
+  color: var(--muted);
+  transition:
+    color 0.3s ease,
+    opacity 0.5s ease;
+  animation: viewIn 0.6s ease both;
+}
+
+.back:hover {
+  color: var(--ink);
+}
+
+.back[hidden] {
+  display: none;
+}
+
+.arrow {
+  position: fixed;
+  top: 50%;
+  z-index: 21;
+  width: 44px;
+  height: 64px;
+  margin-top: -32px;
+  font-size: 30px;
+  line-height: 1;
+  color: var(--muted);
+  transition:
+    color 0.3s ease,
+    opacity 0.5s ease,
+    transform var(--glide) var(--ease);
+}
+
+.arrow:hover {
+  color: var(--ink);
+}
+
+.arrow.prev {
+  left: 1.2vw;
+}
+
+.arrow.next {
+  right: 1.2vw;
+}
+
+/* Arrows belong to the photograph: hidden in Thumbnails and while the panel is open. */
+body.is-thumbs .arrow,
+body.panel-open .arrow {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .switch span {
@@ -167,18 +227,18 @@ body.is-thumbs .switch {
   object-fit: contain;
   opacity: 0;
   backface-visibility: hidden;
-  /* Arriving: eases in quickly, so it covers the old one early. */
-  transition: opacity var(--fade, 1200ms) cubic-bezier(0.25, 0.1, 0.25, 1);
+  /* Arriving: a soft fade in, only after the previous photograph has gone. */
+  transition: opacity var(--in, 600ms) cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 .stage img.is-shown {
   opacity: 1;
 }
 
-/* Leaving: holds on, then lets go late, so the change never dips to white. */
+/* Leaving: fades out completely before the next one appears. */
 .stage img.is-leaving {
   opacity: 0;
-  transition: opacity var(--fade, 1200ms) cubic-bezier(0.6, 0, 0.9, 0.35);
+  transition: opacity var(--out, 300ms) cubic-bezier(0.4, 0, 1, 1);
 }
 
 .zones {
@@ -329,7 +389,108 @@ body.panel-open .panel {
   text-underline-offset: 3px;
 }
 
-/* Thumbnails: scrolls inside its own layer, scrollbar hidden. ------------ */
+/* Get in touch ------------------------------------------------------------ */
+
+.contact h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 400;
+}
+
+.contact .lede {
+  margin: 0 0 28px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.enquiry {
+  display: grid;
+  gap: 18px;
+}
+
+.enquiry label {
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.enquiry input,
+.enquiry select,
+.enquiry textarea {
+  width: 100%;
+  padding: 6px 0;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px; /* 16px stops phones zooming into the field */
+  outline: none;
+  transition: border-color 0.3s ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.enquiry textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.enquiry input:focus,
+.enquiry select:focus,
+.enquiry textarea:focus {
+  border-bottom-color: var(--ink);
+}
+
+.enquiry button[type="submit"] {
+  justify-self: start;
+  margin-top: 6px;
+  font-size: 16px;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+.enquiry button[disabled] {
+  color: var(--muted);
+}
+
+.enquiry .status {
+  min-height: 1.4em;
+  margin: 0;
+  font-size: 14px;
+}
+
+/* The bot trap: off-screen for people, still in the form for bots. */
+.enquiry .trap {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.to-contact {
+  margin-top: 28px;
+}
+
+.to-contact button {
+  font-size: 16px;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+.noscript {
+  max-width: 40ch;
+  margin: 120px auto;
+  font-size: 16px;
+}
+
+/* Thumbnails: an even grid of equal cells, each photograph centred in its
+   cell. Scrolls inside its own layer, scrollbar hidden. ------------------- */
 
 .thumbs {
   position: fixed;
@@ -338,9 +499,12 @@ body.panel-open .panel {
   overscroll-behavior: contain;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
-  columns: 3;
-  column-gap: 7vw;
-  padding: 110px 12vw 120px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 38vw), 1fr));
+  gap: 7vh 5vw;
+  align-content: start;
+  justify-content: center;
+  padding: 120px 10vw 140px;
 }
 
 .thumbs::-webkit-scrollbar {
@@ -348,9 +512,10 @@ body.panel-open .panel {
 }
 
 .thumb {
-  display: block;
-  break-inside: avoid;
-  margin: 0 0 8vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34vh;
   opacity: 0;
   transform: translate3d(0, 14px, 0);
 }
@@ -361,8 +526,8 @@ body.panel-open .panel {
 
 .thumb img {
   width: 100%;
-  height: auto;
-  background: #f4f4f4;
+  height: 100%;
+  object-fit: contain;
 }
 
 /* Cursor: dot and name in difference blend, light over photographs and dark
@@ -509,18 +674,41 @@ body.has-cursor .cursor {
     margin-bottom: 24px;
   }
 
+  /* The footer rises with the panel and sits just above it, so the photo,
+     footer and panel always move together. */
   body.panel-open .switch {
-    z-index: 40;
-    background: var(--paper);
+    transform: translate3d(0, -58vh, 0);
+  }
+
+  body.panel-open .touch-name {
+    opacity: 0;
+  }
+
+  .back {
+    top: 18px;
+    left: 16px;
+  }
+
+  .arrow {
+    width: 32px;
+    font-size: 26px;
+  }
+
+  .arrow.prev {
+    left: 0;
+  }
+
+  .arrow.next {
+    right: 0;
   }
 
   .thumbs {
-    columns: 2;
-    column-gap: 14px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 22px 14px;
     padding: 64px 16px 90px;
   }
 
   .thumb {
-    margin-bottom: 18px;
+    height: 26vh;
   }
 }

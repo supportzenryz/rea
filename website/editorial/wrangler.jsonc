@@ -1,0 +1,22 @@
+// Cloudflare Worker config. Deploy with:
+//   npx wrangler deploy --config website/editorial/wrangler.jsonc
+{
+  "name": "sundar-rajan",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./",
+    "binding": "ASSETS",
+    // These go through the Worker; every photo and script is served directly.
+    "run_worker_first": ["/", "/index.html", "/api/*", "/robots.txt", "/sitemap.xml"]
+  },
+  "vars": {
+    // Where enquiries are emailed (when RESEND_API_KEY is set as a secret).
+    "ENQUIRY_TO": "sundarrajanparamasivan@accademiaitaliana.it"
+  },
+  "observability": { "enabled": true }
+
+  // Optional, to keep a copy of every enquiry and rate-limit senders:
+  // run `npx wrangler kv namespace create ENQUIRIES` and paste the id here.
+  // "kv_namespaces": [{ "binding": "ENQUIRIES", "id": "<id>" }]
+}

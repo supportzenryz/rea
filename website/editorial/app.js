@@ -1,14 +1,13 @@
 // Routes: #/ (slideshow), #/work/<project>/<n>, #/thumbnails,
-// #/index and #/info (slideshow with the panel open on that tab).
+// #/index, #/info and #/contact (slideshow with the panel open on that tab).
 //
 // Smoothness rules this file follows:
-// - A photograph is decoded off-screen before it appears, and the next one is
-//   prepared ahead, so a change never waits on the network or the decoder.
-// - A new photograph fades in on top while the old one fades out more slowly
-//   beneath it; once the new one is fully in, everything beneath is removed.
-//   Nothing can be left behind, and there is no grey dip mid-change.
-// - Only opacity and transform ever animate (both run on the GPU); nothing
-//   animates size or position through layout.
+// - Only one photograph is ever on screen. A change waits for the next
+//   photograph to be decoded off-screen, fades the current one out
+//   completely, then fades the new one in. Two never overlap.
+// - The next photographs are prepared ahead, so a change never waits on the
+//   network or the decoder.
+// - Only opacity and transform animate (both run on the GPU).
 
 (() => {
   const LANDING = window.LANDING;
@@ -16,17 +15,24 @@
   const byId = Object.fromEntries(PROJECTS.map((p) => [p.id, p]));
   const html = document.documentElement;
   const body = document.body;
-  const stageEl = document.getElementById("stage");
+  const $ = (id) => document.getElementById(id);
+  const stageEl = $("stage");
   const zonesEl = stageEl.querySelector(".zones");
-  const thumbsEl = document.getElementById("thumbs");
-  const panelEl = document.getElementById("panel");
-  const worksEl = document.getElementById("works");
-  const infoEl = document.getElementById("info");
-  const touchName = document.getElementById("touch-name");
+  const thumbsEl = $("thumbs");
+  const panelEl = $("panel");
+  const worksEl = $("works");
+  const infoEl = $("info");
+  const touchName = $("touch-name");
+  const backEl = $("back");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const finePointer = matchMedia("(hover: hover) and (pointer: fine)").matches;
 
-  const FADE = { slide: 1600, step: 700, preview: 550 };
+  // Fade timings (ms): out first, then in.
+  const FADE = {
+    slide: { out: 650, in: 1400 },
+    step: { out: 260, in: 560 },
+    preview: { out: 220, in: 460 },
+  };
 
   const CONTACT = {
     email: "sundarrajanparamasivan@accademiaitaliana.it",
@@ -46,7 +52,6 @@
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // Decode cache --------------------------------------------------------
-  // Holding the decoded Image keeps it ready; a small LRU bounds memory.
 
   const cache = new Map();
   const prepare = (src) => {
@@ -63,7 +68,7 @@
       .catch(() => {})
       .then(() => img);
     cache.set(src, ready);
-    while (cache.size > 14) cache.delete(cache.keys().next().value);
+    while (cache.size > 16) cache.delete(cache.keys().next().value);
     return ready;
   };
 
@@ -78,29 +83,31 @@
     shownSrc = src;
     const mine = ++token;
     const decoded = await prepare(src);
-    if (mine !== token) return; // a newer change has already been asked for
+    if (mine !== token) return; // a newer change was asked for meanwhile
 
+    // 1. Fade out whatever is showing, completely.
+    const current = [...stageEl.querySelectorAll("img")];
+    const visible = current.some((i) => i.classList.contains("is-shown"));
+    const out = reduced || !visible ? 0 : fade.out;
+    stageEl.style.setProperty("--out", `${out}ms`);
+    current.forEach((i) => i.classList.replace("is-shown", "is-leaving") || i.classList.add("is-leaving"));
+    if (out) await wait(out);
+    if (mine !== token) return; // the newer change takes over from here
+    current.forEach((i) => i.remove());
+
+    // 2. Then bring the new one in.
     const el = decoded.cloneNode();
     el.alt = alt;
+    el.draggable = false;
     shownRatio = r || decoded.naturalWidth / decoded.naturalHeight || 1;
-    const below = [...stageEl.querySelectorAll("img")];
-    stageEl.style.setProperty("--fade", `${reduced ? 1 : fade}ms`);
+    stageEl.style.setProperty("--in", `${reduced ? 1 : fade.in}ms`);
     stageEl.insertBefore(el, zonesEl);
     fitStage();
-
-    // Next frame: start both fades together.
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        el.classList.add("is-shown");
-        below.forEach((b) => b.classList.replace("is-shown", "is-leaving") || b.classList.add("is-leaving"));
-      }),
-    );
-    // Once the new photograph is fully in, clear everything beneath it.
-    setTimeout(() => below.forEach((b) => b.remove()), (reduced ? 1 : fade) + 80);
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add("is-shown")));
   };
 
-  // With the panel open, the photograph glides and scales (one transform) to
-  // stay centred in the space beside or above the panel.
+  // With the panel open, the photograph glides (and only if it must, scales)
+  // to stay centred in the space beside or above the panel.
   const fitStage = () => {
     if (!isOpen() || stageEl.hidden) {
       stageEl.style.transform = "";
@@ -109,7 +116,7 @@
     const R = { l: stageEl.offsetLeft, t: stageEl.offsetTop, w: stageEl.offsetWidth, h: stageEl.offsetHeight };
     const phone = innerWidth <= 760;
     const T = phone
-      ? { l: R.l, t: R.t, w: R.w, h: innerHeight - panelEl.offsetHeight - 16 - R.t }
+      ? { l: R.l, t: R.t, w: R.w, h: innerHeight - panelEl.offsetHeight - 64 - R.t }
       : { l: R.l, t: R.t, w: innerWidth - panelEl.offsetWidth - innerWidth * 0.06 - R.l, h: R.h };
     const fitW = (w, h) => (w / h > shownRatio ? h * shownRatio : w);
     const s = Math.min(1, fitW(T.w, T.h) / fitW(R.w, R.h));
@@ -131,14 +138,18 @@
     `<dt>Email</dt><dd><a href="mailto:${CONTACT.email}">${esc(CONTACT.email)}</a></dd>` +
     `<dt>Instagram</dt><dd><a href="${CONTACT.instagram.href}" target="_blank" rel="noopener">${esc(CONTACT.instagram.label)}</a></dd>` +
     `<dt>Based</dt><dd>${esc(CONTACT.based)}</dd>` +
-    `</dl>`;
+    `</dl>` +
+    `<p class="to-contact"><button type="button" data-tab="contact">Get in touch →</button></p>`;
 
-  // Covers are decoded ahead so hover previews are instant.
   const warmCovers = () => PROJECTS.forEach((p) => prepare(p.photos[0].src));
 
   const setTab = (tab) => {
-    document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("is-active", b.dataset.tab === tab));
+    document.querySelectorAll(".tabs [data-tab]").forEach((b) => b.classList.toggle("is-active", b.dataset.tab === tab));
     document.querySelectorAll("[data-pane]").forEach((p) => (p.hidden = p.dataset.pane !== tab));
+    if (tab === "contact") {
+      formOpened = Date.now();
+      statusEl.textContent = ""; // no leftover message from a previous attempt
+    }
   };
   const openPanel = (tab = "works") => {
     setTab(tab);
@@ -154,7 +165,10 @@
     markSwitch();
   };
 
-  document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-tab]");
+    if (t) setTab(t.dataset.tab);
+  });
   panelEl.querySelector(".close").addEventListener("click", closePanel);
 
   // Hover previews wait a beat, so skimming the list does not flicker.
@@ -166,14 +180,15 @@
     hoverTimer = setTimeout(() => {
       const ph = byId[a.dataset.id].photos[0];
       show(ph.src, { r: ph.r, fade: FADE.preview });
-    }, 90);
+    }, 110);
   });
   worksEl.addEventListener("pointerleave", () => {
     clearTimeout(hoverTimer);
-    if (!stageEl.hidden) hoverTimer = setTimeout(showCurrent, 90);
+    if (!stageEl.hidden) hoverTimer = setTimeout(showCurrent, 110);
   });
   worksEl.addEventListener("click", () => {
     clearTimeout(hoverTimer);
+    cameFrom = "index";
     body.classList.remove("panel-open");
     markSwitch();
   });
@@ -190,9 +205,20 @@
     e.preventDefault();
     if (route().name === "thumbnails") {
       location.hash = lastStageHash;
-      setTimeout(() => openPanel("works"), 120);
+      setTimeout(() => openPanel("works"), 140);
     } else if (isOpen()) closePanel();
     else openPanel("works");
+  });
+
+  // Back: return to where the project was opened from.
+  let cameFrom = "home";
+  backEl.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (cameFrom === "thumbs") location.hash = "#/thumbnails";
+    else {
+      location.hash = "#/";
+      if (cameFrom === "index") setTimeout(() => openPanel("works"), 140);
+    }
   });
 
   // Slideshow -----------------------------------------------------------
@@ -207,6 +233,7 @@
     setLabel(null);
     await show(s.src, { r: s.r, fade: FADE.slide });
     prepare(LANDING[(slide + 1) % LANDING.length].src);
+    prepare(LANDING[(slide - 1 + LANDING.length) % LANDING.length].src);
     schedule();
   };
   const schedule = () => {
@@ -238,12 +265,11 @@
     const ph = p.photos[n - 1];
     setLabel(p.title);
     show(ph.src, { alt: p.title, r: ph.r, fade: FADE.step });
-    // Prepare both neighbours so stepping either way is instant.
     const next = p.photos[n] || PROJECTS[(PROJECTS.indexOf(p) + 1) % PROJECTS.length].photos[0];
     prepare(next.src);
     if (p.photos[n - 2]) prepare(p.photos[n - 2].src);
     worksEl.querySelectorAll("a").forEach((a) => a.classList.toggle("is-current", a.dataset.id === p.id));
-    document.title = `${p.title} — Sundar Rajan`;
+    document.title = `${p.title} — Sundar Rajan, Fashion Photographer`;
   };
 
   const showCurrent = () => {
@@ -257,15 +283,12 @@
   };
 
   // Names only: the cursor shows the project name (just the dot on the
-  // slideshow), and touch screens show the name under the photograph.
+  // slideshow); touch screens show the name under the photograph.
   const [zonePrev, zoneNext] = zonesEl.querySelectorAll("a");
   function setLabel(name) {
-    if (name) {
-      zonePrev.dataset.cursor = name;
-      zoneNext.dataset.cursor = name;
-    } else {
-      delete zonePrev.dataset.cursor;
-      delete zoneNext.dataset.cursor;
+    for (const z of [zonePrev, zoneNext]) {
+      if (name) z.dataset.cursor = name;
+      else delete z.dataset.cursor;
     }
     touchName.textContent = name || "";
     refreshCursor();
@@ -277,19 +300,38 @@
     if (viewing) location.hash = projectHref(viewing.p, viewing.n + d);
     else showSlide(slide + d);
   };
-  // With the panel open, a click on the photograph only closes the panel.
-  const onZone = (d) => (e) => {
+  const onStep = (d) => (e) => {
     e.preventDefault();
     if (isOpen()) closePanel();
     else step(d);
   };
-  zonePrev.addEventListener("click", onZone(-1));
-  zoneNext.addEventListener("click", onZone(1));
+  zonePrev.addEventListener("click", onStep(-1));
+  zoneNext.addEventListener("click", onStep(1));
+  $("arrow-prev").addEventListener("click", onStep(-1));
+  $("arrow-next").addEventListener("click", onStep(1));
 
-  // Any other click outside the panel closes it too.
+  // Swipe on touch screens.
+  let touch = null;
+  stageEl.addEventListener("touchstart", (e) => (touch = e.touches[0] && { x: e.touches[0].clientX, y: e.touches[0].clientY }), {
+    passive: true,
+  });
+  stageEl.addEventListener(
+    "touchend",
+    (e) => {
+      if (!touch || isOpen()) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - touch.x;
+      const dy = t.clientY - touch.y;
+      touch = null;
+      if (Math.abs(dx) > 45 && Math.abs(dy) < 70) step(dx < 0 ? 1 : -1);
+    },
+    { passive: true },
+  );
+
+  // Any other click outside the panel closes it.
   document.addEventListener("click", (e) => {
     if (!isOpen()) return;
-    if (e.target.closest("#panel, [data-view='index'], .zones")) return;
+    if (e.target.closest("#panel, [data-view='index'], .zones, .arrow, [data-tab]")) return;
     closePanel();
   });
 
@@ -312,10 +354,11 @@
       p.photos.map(
         (ph, i) =>
           `<a class="thumb" href="#/work/${p.id}/${i + 1}" data-cursor="${esc(p.title)}">` +
-          `<img src="${thumbOf(ph.src)}" alt="${esc(p.title)}" loading="lazy" decoding="async" style="aspect-ratio:${ph.r}" /></a>`,
+          `<img src="${thumbOf(ph.src)}" alt="${esc(p.title)}" loading="lazy" decoding="async" draggable="false" /></a>`,
       ),
     ).join("");
     thumbsEl.querySelectorAll(".thumb").forEach((t) => io.observe(t));
+    thumbsEl.addEventListener("click", (e) => e.target.closest(".thumb") && (cameFrom = "thumbs"));
   };
 
   // Crossfade between the stage and the thumbnails instead of cutting.
@@ -340,13 +383,70 @@
     }, reduced ? 0 : 520);
   };
 
+  // Enquiry form --------------------------------------------------------
+  // Sends to the site's /api/enquiry. If that is not available (or not set
+  // up yet), it opens the visitor's email app with the enquiry filled in,
+  // so an enquiry is never lost.
+
+  const form = $("enquiry");
+  const statusEl = form.querySelector(".status");
+  let formOpened = Date.now();
+
+  const mailtoFallback = (d) => {
+    const subject = encodeURIComponent(`${d.type} enquiry from ${d.name}`);
+    const bodyText = encodeURIComponent(`${d.message}\n\n${d.name}\n${d.email}`);
+    location.href = `mailto:${CONTACT.email}?subject=${subject}&body=${bodyText}`;
+  };
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(form));
+    d.name = (d.name || "").trim();
+    d.email = (d.email || "").trim();
+    d.message = (d.message || "").trim();
+    const problems = [];
+    if (!d.name) problems.push("your name");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) problems.push("a valid email");
+    if (d.message.length < 10) problems.push("a short message");
+    if (problems.length) {
+      statusEl.textContent = `Please add ${problems.join(", ")}.`;
+      return;
+    }
+    const button = form.querySelector("button[type=submit]");
+    button.disabled = true;
+    statusEl.textContent = "Sending…";
+    try {
+      const res = await fetch("/api/enquiry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...d, elapsed: Date.now() - formOpened }),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (res.ok && out.ok) {
+        form.reset();
+        statusEl.textContent = "Thank you. Your message has been sent.";
+      } else if (res.status === 400 && out.error) {
+        statusEl.textContent = out.error;
+      } else {
+        statusEl.textContent = "Opening your email app to send this…";
+        mailtoFallback(d);
+      }
+    } catch {
+      statusEl.textContent = "Opening your email app to send this…";
+      mailtoFallback(d);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   // Router --------------------------------------------------------------
 
   const route = () => {
     const [a, b, c] = location.hash.replace(/^#\/?/, "").split("/");
     if (a === "work" && byId[b]) return { name: "project", p: byId[b], n: parseInt(c, 10) || 1 };
     if (a === "thumbnails") return { name: "thumbnails" };
-    return { name: "landing", panel: a === "info" ? "info" : a === "index" ? "works" : null };
+    const panel = { index: "works", info: "info", contact: "contact" }[a] || null;
+    return { name: "landing", panel };
   };
 
   const render = () => {
@@ -354,7 +454,8 @@
     const thumbs = r.name === "thumbnails";
     body.classList.toggle("in-project", r.name === "project");
     body.classList.toggle("is-thumbs", thumbs);
-    document.title = "Sundar Rajan";
+    backEl.hidden = r.name !== "project";
+    document.title = "Sundar Rajan — Fashion Photographer, India & Europe";
     swapView(thumbs);
 
     if (thumbs) {
@@ -364,6 +465,7 @@
       }
       buildThumbs();
       touchName.textContent = "";
+      document.title = "Thumbnails — Sundar Rajan";
     } else {
       lastStageHash = location.hash || "#/";
       if (r.name === "project") showProject(r.p, r.n);
@@ -382,8 +484,10 @@
   window.addEventListener("hashchange", render);
 
   document.addEventListener("keydown", (e) => {
+    if (e.target.closest && e.target.closest("input, textarea, select")) return;
     if (e.key === "Escape") {
       if (isOpen()) closePanel();
+      else if (route().name === "project") backEl.click();
       else if (route().name !== "landing") location.hash = "#/";
       return;
     }
@@ -393,10 +497,8 @@
   });
 
   // Cursor --------------------------------------------------------------
-  // Hidden until the pointer first moves (so it never jumps in from the
-  // centre), then eased with a frame-rate independent follow.
 
-  const cursor = document.getElementById("cursor");
+  const cursor = $("cursor");
   const cursorLabel = cursor.querySelector(".label");
   const pos = { x: -100, y: -100 };
   const drawn = { ...pos };
@@ -449,8 +551,7 @@
     requestAnimationFrame(loop);
   }
 
-  // Fonts: text stays hidden until the serif is ready (at most 1.5 s), then
-  // fades in once, so it never swaps from a fallback face.
+  // Fonts ---------------------------------------------------------------
 
   const fontsReady = Promise.race([
     document.fonts ? document.fonts.load('400 16px "Cormorant Garamond"') : Promise.resolve(),
@@ -459,10 +560,9 @@
   fontsReady.then(() => html.classList.remove("fonts-pending"));
 
   // Opening: the name fades in alone, holds, then softly dissolves in place
-  // while the page clears to the slideshow.
-  // Once per visit; add ?intro to the URL to see it again.
+  // while the page clears to the slideshow. Once per visit (?intro replays).
 
-  const intro = document.getElementById("intro");
+  const intro = $("intro");
   let seen = false;
   try {
     seen = sessionStorage.getItem("sr-intro") === "1";
@@ -476,9 +576,8 @@
     intro.remove();
   } else {
     introPlaying = true;
-    const nameEl = document.getElementById("intro-name");
+    const nameEl = $("intro-name");
     let revealTimer = 0;
-
     const reveal = () => {
       if (intro.classList.contains("is-out")) return;
       clearTimeout(revealTimer);
@@ -486,20 +585,17 @@
       setTimeout(() => {
         intro.remove();
         introPlaying = false;
-        if (route().name === "landing") schedule(); // the first slide gets its full time
+        if (route().name === "landing") schedule();
       }, 1700);
       try {
         sessionStorage.setItem("sr-intro", "1");
       } catch {}
     };
-
     const dissolve = () => {
       nameEl.classList.add("is-dissolving");
       revealTimer = setTimeout(reveal, 1800);
     };
-
     fontsReady.then(() => requestAnimationFrame(() => intro.classList.add("is-in")));
-    // Hold the name (and wait for the first photograph) before it dissolves.
     Promise.race([
       Promise.all([prepare(LANDING[0].src), fontsReady.then(() => wait(3400))]),
       wait(7000),
