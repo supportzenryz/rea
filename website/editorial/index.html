@@ -34,9 +34,10 @@
     />
     <!--seo-->
 
-    <!-- The first slide, sized for the screen (app.js picks the same file). -->
-    <link rel="preload" as="image" href="/medium/landing/01.jpg" media="(max-width: 1024px)" fetchpriority="high" />
-    <link rel="preload" as="image" href="/photos/landing/01.jpg" media="(min-width: 1025px)" fetchpriority="high" />
+    <!-- The first slide, sized for the screen, as WebP (app.js picks the same
+         file). Browsers without WebP skip these and load the JPEG later. -->
+    <link rel="preload" as="image" type="image/webp" href="/medium/landing/01.webp" media="(max-width: 1024px)" fetchpriority="high" />
+    <link rel="preload" as="image" type="image/webp" href="/photos/landing/01.webp" media="(min-width: 1025px)" fetchpriority="high" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="/styles.css" />

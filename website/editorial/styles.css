@@ -550,6 +550,11 @@ body.panel-open .panel {
   animation: rise 1s var(--ease) forwards;
 }
 
+/* The <picture> wrapper (WebP with JPEG fallback) stays out of the layout. */
+.thumb picture {
+  display: contents;
+}
+
 .thumb img {
   width: 100%;
   height: 100%;

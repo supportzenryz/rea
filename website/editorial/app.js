@@ -55,7 +55,13 @@
 
   // Phones and tablets get the 1200px copies (medium/); larger screens the
   // full files. index.html preloads the first slide with the same rule.
-  const sized = (src) => (innerWidth <= 1024 ? src.replace(/^photos\//, "medium/") : src);
+  // Browsers that show WebP (decided in boot.js before first render) get the
+  // .webp beside each .jpg, about half the size; others keep the JPEG.
+  let webpOK = false;
+  const sized = (src) => {
+    const s = innerWidth <= 1024 ? src.replace(/^photos\//, "medium/") : src;
+    return webpOK ? s.replace(/\.jpg$/, ".webp") : s;
+  };
 
   const cache = new Map();
   const prepare = (raw) => {
@@ -393,7 +399,9 @@
             .map(
               (ph, i) =>
                 `<a class="thumb" href="#/work/${p.id}/${i + 1}" data-cursor="${esc(p.title)}">` +
-                `<img src="${thumbOf(ph.src)}" alt="${esc(p.title)}" loading="lazy" decoding="async" draggable="false" /></a>`,
+                // WebP where supported, JPEG otherwise: the browser picks.
+                `<picture><source type="image/webp" srcset="${thumbOf(ph.src).replace(/\.jpg$/, ".webp")}" />` +
+                `<img src="${thumbOf(ph.src)}" alt="${esc(p.title)}" loading="lazy" decoding="async" draggable="false" /></picture></a>`,
             )
             .join(""),
       )
@@ -627,6 +635,9 @@
     if (route().name === "landing" && !isOpen()) openPanel("works");
   };
 
+  // Everything below waits for the WebP check (a few milliseconds), so the
+  // first photograph is already requested in the right format.
+  const start = () => {
   thumbsEl.hidden = true;
   if (play) {
     introPlaying = true;
@@ -702,4 +713,10 @@
     intro.addEventListener("click", finish);
     addEventListener("keydown", finish, { once: true });
   }
+  };
+
+  (window.__webp || Promise.resolve(false)).then((ok) => {
+    webpOK = ok;
+    start();
+  });
 })();
