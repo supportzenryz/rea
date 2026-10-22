@@ -1,7 +1,7 @@
 :root {
   --paper: #fff;
   --ink: #1a1a1a;
-  --muted: #a9a9a9;
+  --muted: #767676; /* 4.5:1 on white: meets WCAG AA for small text */
   --rule: #ececec;
   --serif: "Cormorant Garamond", Georgia, serif;
   --panel-w: clamp(290px, 27vw, 400px);
@@ -115,9 +115,25 @@ img {
 
 .switch {
   bottom: 0;
-  gap: 18px;
-  padding: 14px 16px 22px;
+  gap: 14px;
+  padding: 10px 16px 18px;
   font-size: 15px;
+}
+
+/* At least 24px tall to tap (WCAG 2.2 target size). */
+.switch a {
+  display: inline-block;
+  padding: 4px 4px;
+}
+
+/* Keyboard focus is always visible; the mouse never shows it. */
+:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 4px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
 }
 
 body.panel-open .masthead,
@@ -239,6 +255,16 @@ body.panel-open .arrow {
 .stage img.is-leaving {
   opacity: 0;
   transition: opacity var(--out, 300ms) cubic-bezier(0.4, 0, 1, 1);
+}
+
+.zones button {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: inherit;
 }
 
 .zones {
@@ -606,7 +632,39 @@ body.has-cursor .cursor {
   object-fit: contain;
 }
 
+/* The name sits in the centre over the cuts. White in difference blend:
+   it reads dark on the white page and light on any photograph. */
+.intro-name {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: #fff;
+  mix-blend-mode: difference;
+  font-size: 17px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+
+.intro.name-in .intro-name {
+  opacity: 1;
+}
+
+/* Then it dissolves in place: softens and fades, nothing moves. */
+.intro.name-in .intro-name.is-dissolving {
+  opacity: 0;
+  filter: blur(6px);
+  transition:
+    opacity 1.4s cubic-bezier(0.45, 0, 0.25, 1),
+    filter 1.4s cubic-bezier(0.45, 0, 0.25, 1);
+}
+
 /* While it plays, only the name and the photographs show. */
+body.intro-playing .masthead,
 body.intro-playing .switch,
 body.intro-playing .arrow,
 body.intro-playing .back,
@@ -680,6 +738,7 @@ body.intro-playing .touch-name {
   .panel {
     top: auto;
     height: 58vh;
+    height: 58dvh; /* follows the iPhone toolbar as it shows and hides */
     padding: 20px 16px 70px;
     border-left: 0;
     border-top: 1px solid var(--rule);

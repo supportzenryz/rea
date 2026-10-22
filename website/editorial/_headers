@@ -1,0 +1,10 @@
+# Photographs rarely change: let browsers keep them for 30 days (and use a
+# stale copy while re-checking for a day after that).
+/photos/*
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
+/medium/*
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
+/thumbs/*
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
+/favicon.svg
+  Cache-Control: public, max-age=2592000

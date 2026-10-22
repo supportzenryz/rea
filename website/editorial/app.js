@@ -53,8 +53,13 @@
 
   // Decode cache --------------------------------------------------------
 
+  // Phones and tablets get the 1200px copies (medium/); larger screens the
+  // full files. index.html preloads the first slide with the same rule.
+  const sized = (src) => (innerWidth <= 1024 ? src.replace(/^photos\//, "medium/") : src);
+
   const cache = new Map();
-  const prepare = (src) => {
+  const prepare = (raw) => {
+    const src = sized(raw);
     if (cache.has(src)) {
       const hit = cache.get(src);
       cache.delete(src);
@@ -78,7 +83,8 @@
   let shownRatio = 1;
   let token = 0;
 
-  const show = async (src, { alt = "", r = 0, fade = FADE.step } = {}) => {
+  const show = async (raw, { alt = "", r = 0, fade = FADE.step } = {}) => {
+    const src = sized(raw);
     if (shownSrc === src) {
       fitStage(); // same photograph, but the panel may have opened or closed
       return;
@@ -203,6 +209,10 @@
   // Index — Thumbnails ----------------------------------------------------
 
   const markSwitch = () => {
+    const indexLink = document.querySelector('[data-view="index"]');
+    indexLink.classList.toggle("is-active", isOpen());
+    indexLink.setAttribute("aria-expanded", String(isOpen()));
+    panelEl.inert = !isOpen(); // a closed panel is off screen: keep it out of Tab order
     document.querySelector('[data-view="index"]').classList.toggle("is-active", isOpen());
     document.querySelector('[data-view="thumbnails"]').classList.toggle("is-active", route().name === "thumbnails");
   };
@@ -251,7 +261,7 @@
     slide = (i + LANDING.length) % LANDING.length;
     const s = LANDING[slide];
     setLabel(byId[s.project] ? byId[s.project].title : null); // which project this photo is from
-    await show(s.src, { r: s.r, fade: FADE.slide });
+    await show(s.src, { alt: byId[s.project] ? `${byId[s.project].title}, photograph by Sundar Rajan` : "", r: s.r, fade: FADE.slide });
     prepare(LANDING[(slide + 1) % LANDING.length].src);
     prepare(LANDING[(slide - 1 + LANDING.length) % LANDING.length].src);
     schedule();
@@ -305,7 +315,7 @@
 
   // Names only: the cursor shows the project name (just the dot on the
   // slideshow); touch screens show the name under the photograph.
-  const [zonePrev, zoneNext] = zonesEl.querySelectorAll("a");
+  const [zonePrev, zoneNext] = zonesEl.querySelectorAll("button");
   function setLabel(name) {
     for (const z of [zonePrev, zoneNext]) {
       if (name) z.dataset.cursor = name;
@@ -595,10 +605,11 @@
   ]).catch(() => {});
   fontsReady.then(() => html.classList.remove("fonts-pending"));
 
-  // Opening: photographs cut fast in the centre while the name stays at the
-  // top; the last frame is the first slide, in exactly its place, so it hands
-  // over to the slideshow without a seam. Then the Works list slides in
-  // beside it. Once per visit; add ?intro to the URL to see it again.
+  // Opening: photographs cut fast in the centre with the name in the middle
+  // of the screen; the last frame is the first slide, in exactly its place.
+  // The name then dissolves, the page hands over to the slideshow without a
+  // seam, and the Works list slides in beside it. Once per visit; add ?intro
+  // to the URL to see it again.
 
   const intro = $("intro");
   const introStage = $("intro-stage");
@@ -625,15 +636,23 @@
     intro.remove();
     if (firstRoute.name === "landing" && !firstRoute.panel) setTimeout(showWorkOnSide, 500);
   } else {
-    // Two frames from every project (the small copies decode fast), cut
-    // quicker and quicker, then easing off into the first slide.
+    // Twelve frames: one from every project, then four more (the small copies
+    // load fast), cut quicker and quicker, then easing off into the first slide.
     const frames = [
       ...PROJECTS.map((p) => p.photos[1] || p.photos[0]),
-      ...PROJECTS.map((p) => p.photos[p.photos.length - 1]),
+      ...PROJECTS.slice(0, 4).map((p) => p.photos[p.photos.length - 1]),
     ].map((ph) => thumbOf(ph.src));
-    const HOLD = [230, 180, 145, 120, 105, 95, 88, 84, 84, 88, 95, 105, 120, 145, 180, 220];
+    const HOLD = [230, 170, 130, 105, 92, 86, 86, 92, 105, 130, 170, 220];
     const timers = [];
     let finished = false;
+    const nameEl = $("intro-name");
+
+    // Frames are fetched in order; a frame that is not ready by its turn is
+    // skipped rather than waited for, so a slow connection never stalls the run.
+    const decoded = new Map();
+    frames.forEach((f) => prepare(f).then((img) => img.naturalWidth && decoded.set(f, img)));
+    let firstSlide = null;
+    prepare(LANDING[0].src).then((img) => img.naturalWidth && (firstSlide = img));
 
     const finish = () => {
       if (finished) return;
@@ -655,28 +674,28 @@
     };
 
     const cut = (img) => {
+      if (!img) return;
       const el = img.cloneNode();
       el.alt = "";
       introStage.replaceChildren(el);
     };
-    // Resolves to the decoded image if it is ready now, otherwise null.
-    const ready = (src) => Promise.race([prepare(src), wait(0).then(() => null)]);
 
-    // Start only once every frame is decoded (at most 4 s), so no cut stutters.
-    Promise.race([Promise.all([fontsReady, prepare(LANDING[0].src), ...frames.map(prepare)]), wait(4000)]).then(
-      async () => {
-        if (finished) return;
-        const imgs = (await Promise.all(frames.map(ready))).filter((i) => i && i.naturalWidth);
-        const last = await ready(LANDING[0].src);
-        let t = 120;
-        imgs.forEach((img, k) => {
-          timers.push(setTimeout(() => cut(img), t));
-          t += HOLD[k] ?? 100;
-        });
-        timers.push(setTimeout(() => last && last.naturalWidth && cut(last), t));
-        timers.push(setTimeout(finish, t + 650));
-      },
-    );
+    // The name appears as soon as the font is ready; the cuts start once the
+    // first three frames are in (at most 1.5 s).
+    fontsReady.then(() => requestAnimationFrame(() => intro.classList.add("name-in")));
+    const firstThree = Promise.all(frames.slice(0, 3).map(prepare));
+    Promise.race([Promise.all([fontsReady, firstThree]), wait(1500)]).then(() => {
+      if (finished) return;
+      let t = 0;
+      frames.forEach((f, k) => {
+        timers.push(setTimeout(() => cut(decoded.get(f)), t));
+        t += HOLD[k] ?? 100;
+      });
+      // Last frame: the first slide, held while the name dissolves.
+      timers.push(setTimeout(() => cut(firstSlide), t));
+      timers.push(setTimeout(() => nameEl.classList.add("is-dissolving"), t + 450));
+      timers.push(setTimeout(finish, t + 450 + 1150));
+    });
     intro.addEventListener("click", finish);
     addEventListener("keydown", finish, { once: true });
   }

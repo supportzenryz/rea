@@ -34,18 +34,20 @@
     />
     <!--seo-->
 
-    <link rel="preload" as="image" href="/photos/landing/01.jpg" fetchpriority="high" />
+    <!-- The first slide, sized for the screen (app.js picks the same file). -->
+    <link rel="preload" as="image" href="/medium/landing/01.jpg" media="(max-width: 1024px)" fetchpriority="high" />
+    <link rel="preload" as="image" href="/photos/landing/01.jpg" media="(min-width: 1025px)" fetchpriority="high" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&display=swap"
-    />
     <link rel="stylesheet" href="/styles.css" />
+    <!-- Also loads the web font without blocking the first paint. -->
     <script src="/boot.js"></script>
   </head>
   <body>
-    <div id="intro" class="intro" aria-hidden="true"><div id="intro-stage" class="intro-stage"></div></div>
+    <div id="intro" class="intro" aria-hidden="true">
+      <div id="intro-stage" class="intro-stage"></div>
+      <p id="intro-name" class="intro-name">Sundar Rajan</p>
+    </div>
 
     <header class="masthead">
       <h1 class="name"><a href="#/">Sundar Rajan</a></h1>
@@ -55,7 +57,11 @@
 
     <main>
       <section id="stage" class="stage" aria-label="Photograph" aria-live="polite">
-        <div class="zones"><a data-zone="prev"></a><a data-zone="next"></a></div>
+        <!-- Click halves of the photograph; keyboard users have the arrow buttons. -->
+        <div class="zones">
+          <button type="button" data-zone="prev" tabindex="-1" aria-label="Previous photograph"></button>
+          <button type="button" data-zone="next" tabindex="-1" aria-label="Next photograph"></button>
+        </div>
       </section>
       <button id="arrow-prev" class="arrow prev" type="button" aria-label="Previous photograph">‹</button>
       <button id="arrow-next" class="arrow next" type="button" aria-label="Next photograph">›</button>
@@ -98,7 +104,7 @@
     </aside>
 
     <nav class="switch" aria-label="View">
-      <a href="#/" data-view="index">Index</a>
+      <a href="#/" data-view="index" aria-controls="panel" aria-expanded="false">Index</a>
       <span aria-hidden="true">—</span>
       <a href="#/thumbnails" data-view="thumbnails">Thumbnails</a>
     </nav>
@@ -123,7 +129,7 @@
       </div>
     </noscript>
 
-    <script src="/data.js"></script>
-    <script src="/app.js"></script>
+    <script src="/data.js" defer></script>
+    <script src="/app.js" defer></script>
   </body>
 </html>

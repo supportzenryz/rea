@@ -50,6 +50,7 @@ const SECURITY_HEADERS = {
     "object-src 'none'",
     "frame-ancestors 'none'",
   ].join("; "),
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), interest-cohort=()",
