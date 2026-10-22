@@ -365,6 +365,15 @@
     { passive: true },
   );
 
+  // A mouse click leaves nothing focused, so a later key press (for example
+  // the arrow keys) never draws a focus outline on what was clicked. Keyboard
+  // activation (detail 0) keeps focus, so keyboard users keep their outlines.
+  document.addEventListener("click", (e) => {
+    if (e.detail === 0) return;
+    const el = e.target.closest("button, a");
+    if (el && !el.closest("form")) el.blur();
+  });
+
   // Any other click outside the panel closes it.
   document.addEventListener("click", (e) => {
     if (!isOpen()) return;

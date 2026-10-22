@@ -257,6 +257,13 @@ body.panel-open .arrow {
   transition: opacity var(--out, 300ms) cubic-bezier(0.4, 0, 1, 1);
 }
 
+/* The click halves are for the mouse only (keyboard users have the arrow
+   buttons), so they never show a focus outline. */
+.zones button:focus,
+.zones button:focus-visible {
+  outline: none;
+}
+
 .zones button {
   display: block;
   width: 100%;
