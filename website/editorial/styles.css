@@ -156,7 +156,7 @@ body.is-thumbs .switch {
 
 .name {
   margin: 0;
-  font-size: 15px;
+  font-size: 19px;
   font-weight: 400;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -653,7 +653,7 @@ body.has-cursor .cursor {
   place-items: center;
   margin: 0;
   color: var(--ink);
-  font-size: 17px;
+  font-size: 24px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   opacity: 0;
@@ -727,6 +727,10 @@ body.intro-playing .touch-name {
 /* Phones: the panel rises from the bottom; the photo glides up above it. */
 
 @media (max-width: 760px) {
+  .name {
+    font-size: 17px;
+  }
+
   :root {
     --panel-w: 100vw;
   }
@@ -790,7 +794,7 @@ body.intro-playing .touch-name {
   .thumbs {
     grid-template-columns: repeat(2, 1fr);
     gap: 22px 14px;
-    padding: 58px 16px 84px;
+    padding: 66px 16px 84px;
   }
 
   .thumb {
