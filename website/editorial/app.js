@@ -387,7 +387,8 @@
     thumbsEl.innerHTML = list
       .map(
         (p) =>
-          `<h2 class="thumbs-title">${esc(p.title)}</h2>` +
+          // One project: photographs only. Every project: a name between groups.
+          (scope ? "" : `<h2 class="thumbs-title">${esc(p.title)}</h2>`) +
           p.photos
             .map(
               (ph, i) =>
@@ -605,11 +606,12 @@
   ]).catch(() => {});
   fontsReady.then(() => html.classList.remove("fonts-pending"));
 
-  // Opening: photographs cut fast in the centre with the name in the middle
-  // of the screen; the last frame is the first slide, in exactly its place.
-  // The name then dissolves, the page hands over to the slideshow without a
-  // seam, and the Works list slides in beside it. Once per visit; add ?intro
-  // to the URL to see it again.
+  // Opening, in four beats:
+  //   1. photographs cut fast in the centre (no text);
+  //   2. a clean white page with only the name in the centre;
+  //   3. the name dissolves in place;
+  //   4. the page clears to the regular slideshow, and the Works list slides in.
+  // Once per visit; add ?intro to the URL to see it again.
 
   const intro = $("intro");
   const introStage = $("intro-stage");
@@ -637,7 +639,7 @@
     if (firstRoute.name === "landing" && !firstRoute.panel) setTimeout(showWorkOnSide, 500);
   } else {
     // Twelve frames: one from every project, then four more (the small copies
-    // load fast), cut quicker and quicker, then easing off into the first slide.
+    // load fast), cut quicker and quicker, then easing off.
     const frames = [
       ...PROJECTS.map((p) => p.photos[1] || p.photos[0]),
       ...PROJECTS.slice(0, 4).map((p) => p.photos[p.photos.length - 1]),
@@ -651,8 +653,6 @@
     // skipped rather than waited for, so a slow connection never stalls the run.
     const decoded = new Map();
     frames.forEach((f) => prepare(f).then((img) => img.naturalWidth && decoded.set(f, img)));
-    let firstSlide = null;
-    prepare(LANDING[0].src).then((img) => img.naturalWidth && (firstSlide = img));
 
     const finish = () => {
       if (finished) return;
@@ -680,21 +680,24 @@
       introStage.replaceChildren(el);
     };
 
-    // The name appears as soon as the font is ready; the cuts start once the
-    // first three frames are in (at most 1.5 s).
-    fontsReady.then(() => requestAnimationFrame(() => intro.classList.add("name-in")));
+    // The cuts start once the first three frames are in (at most 1.5 s).
     const firstThree = Promise.all(frames.slice(0, 3).map(prepare));
     Promise.race([Promise.all([fontsReady, firstThree]), wait(1500)]).then(() => {
       if (finished) return;
       let t = 0;
+      // 1. Fast cuts.
       frames.forEach((f, k) => {
         timers.push(setTimeout(() => cut(decoded.get(f)), t));
         t += HOLD[k] ?? 100;
       });
-      // Last frame: the first slide, held while the name dissolves.
-      timers.push(setTimeout(() => cut(firstSlide), t));
-      timers.push(setTimeout(() => nameEl.classList.add("is-dissolving"), t + 450));
-      timers.push(setTimeout(finish, t + 450 + 1150));
+      // 2. Clean page, then the name alone in the centre.
+      timers.push(setTimeout(() => introStage.replaceChildren(), t));
+      timers.push(setTimeout(() => intro.classList.add("name-in"), t + 250));
+      // 3. After a moment on screen, the name dissolves (1.6 s).
+      const dissolveAt = t + 250 + 700 + 700;
+      timers.push(setTimeout(() => nameEl.classList.add("is-dissolving"), dissolveAt));
+      // 4. Then the page clears to the slideshow.
+      timers.push(setTimeout(finish, dissolveAt + 1650));
     });
     intro.addEventListener("click", finish);
     addEventListener("keydown", finish, { once: true });

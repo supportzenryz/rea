@@ -530,7 +530,7 @@ body.panel-open .panel {
   gap: 7vh 5vw;
   align-content: start;
   justify-content: center;
-  padding: 120px 10vw 140px;
+  padding: 84px 10vw 120px;
 }
 
 .thumbs::-webkit-scrollbar {
@@ -632,8 +632,7 @@ body.has-cursor .cursor {
   object-fit: contain;
 }
 
-/* The name sits in the centre over the cuts. White in difference blend:
-   it reads dark on the white page and light on any photograph. */
+/* After the cuts: a clean white page with only the name in the centre. */
 .intro-name {
   position: absolute;
   inset: 0;
@@ -641,26 +640,25 @@ body.has-cursor .cursor {
   display: grid;
   place-items: center;
   margin: 0;
-  color: #fff;
-  mix-blend-mode: difference;
+  color: var(--ink);
   font-size: 17px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   opacity: 0;
-  transition: opacity 0.9s ease;
+  transition: opacity 0.7s ease;
 }
 
 .intro.name-in .intro-name {
   opacity: 1;
 }
 
-/* Then it dissolves in place: softens and fades, nothing moves. */
+/* Then it dissolves in place: softens and fades slowly, nothing moves. */
 .intro.name-in .intro-name.is-dissolving {
   opacity: 0;
-  filter: blur(6px);
+  filter: blur(8px);
   transition:
-    opacity 1.4s cubic-bezier(0.45, 0, 0.25, 1),
-    filter 1.4s cubic-bezier(0.45, 0, 0.25, 1);
+    opacity 1.6s cubic-bezier(0.45, 0, 0.25, 1),
+    filter 1.6s cubic-bezier(0.45, 0, 0.25, 1);
 }
 
 /* While it plays, only the name and the photographs show. */
@@ -780,7 +778,7 @@ body.intro-playing .touch-name {
   .thumbs {
     grid-template-columns: repeat(2, 1fr);
     gap: 22px 14px;
-    padding: 64px 16px 90px;
+    padding: 58px 16px 84px;
   }
 
   .thumb {
