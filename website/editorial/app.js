@@ -221,7 +221,10 @@
   // slideshow, every project grouped under its name.
   document.querySelector('[data-view="thumbnails"]').addEventListener("click", (e) => {
     e.preventDefault();
-    location.hash = viewing ? `#/thumbnails/${viewing.p.id}` : "#/thumbnails";
+    // In a project, or on a slideshow photo (each belongs to a project), show
+    // only that project's thumbnails.
+    const id = viewing ? viewing.p.id : LANDING[slide].project;
+    location.hash = id && byId[id] ? `#/thumbnails/${id}` : "#/thumbnails";
   });
 
   // Back: return to where the project was opened from.
@@ -229,7 +232,9 @@
   let thumbsReturn = "#/thumbnails";
   backEl.addEventListener("click", (e) => {
     e.preventDefault();
-    if (cameFrom === "thumbs") location.hash = thumbsReturn;
+    // From Thumbnails: back to the slideshow photo or project it was opened from.
+    if (route().name === "thumbnails") location.hash = lastStageHash;
+    else if (cameFrom === "thumbs") location.hash = thumbsReturn;
     else {
       location.hash = "#/";
       if (cameFrom === "index") setTimeout(() => openPanel("works"), 140);
@@ -245,7 +250,7 @@
   const showSlide = async (i) => {
     slide = (i + LANDING.length) % LANDING.length;
     const s = LANDING[slide];
-    setLabel(null);
+    setLabel(byId[s.project] ? byId[s.project].title : null); // which project this photo is from
     await show(s.src, { r: s.r, fade: FADE.slide });
     prepare(LANDING[(slide + 1) % LANDING.length].src);
     prepare(LANDING[(slide - 1 + LANDING.length) % LANDING.length].src);
@@ -485,7 +490,7 @@
     const thumbs = r.name === "thumbnails";
     body.classList.toggle("in-project", r.name === "project");
     body.classList.toggle("is-thumbs", thumbs);
-    backEl.hidden = r.name !== "project";
+    backEl.hidden = r.name === "landing"; // Back in projects and in Thumbnails
     document.title = "Sundar Rajan — Fashion Photographer, India & Europe";
     swapView(thumbs);
 

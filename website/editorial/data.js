@@ -1,22 +1,23 @@
 // Generated from the files in photos/. r = width / height.
+// Each slideshow photo is a copy of a project photo: project and n say which.
 
 window.LANDING = [
-  { src: "photos/landing/01.jpg", r: 1.167 },
-  { src: "photos/landing/02.jpg", r: 1.167 },
-  { src: "photos/landing/03.jpg", r: 1.167 },
-  { src: "photos/landing/04.jpg", r: 1.225 },
-  { src: "photos/landing/05.jpg", r: 1.167 },
-  { src: "photos/landing/06.jpg", r: 1.166 },
-  { src: "photos/landing/07.jpg", r: 1.167 },
-  { src: "photos/landing/08.jpg", r: 1.251 },
-  { src: "photos/landing/09.jpg", r: 1.252 },
-  { src: "photos/landing/10.jpg", r: 1.095 },
-  { src: "photos/landing/11.jpg", r: 1.252 },
-  { src: "photos/landing/12.jpg", r: 1.245 },
-  { src: "photos/landing/13.jpg", r: 1.333 },
-  { src: "photos/landing/14.jpg", r: 1.167 },
-  { src: "photos/landing/15.jpg", r: 1.225 },
-  { src: "photos/landing/16.jpg", r: 1.262 },
+  { src: "photos/landing/01.jpg", r: 1.167, project: "unmasked", n: 8 },
+  { src: "photos/landing/02.jpg", r: 1.167, project: "still-here", n: 5 },
+  { src: "photos/landing/03.jpg", r: 1.167, project: "elsewhere", n: 8 },
+  { src: "photos/landing/04.jpg", r: 1.225, project: "sleeeep", n: 2 },
+  { src: "photos/landing/05.jpg", r: 1.167, project: "elsewhere", n: 1 },
+  { src: "photos/landing/06.jpg", r: 1.166, project: "taste-of-routine", n: 1 },
+  { src: "photos/landing/07.jpg", r: 1.167, project: "elsewhere", n: 6 },
+  { src: "photos/landing/08.jpg", r: 1.251, project: "taste-of-routine", n: 2 },
+  { src: "photos/landing/09.jpg", r: 1.252, project: "unmasked", n: 7 },
+  { src: "photos/landing/10.jpg", r: 1.095, project: "taste-of-routine", n: 6 },
+  { src: "photos/landing/11.jpg", r: 1.252, project: "unmasked", n: 6 },
+  { src: "photos/landing/12.jpg", r: 1.245, project: "taste-of-routine", n: 8 },
+  { src: "photos/landing/13.jpg", r: 1.333, project: "unarmoured", n: 6 },
+  { src: "photos/landing/14.jpg", r: 1.167, project: "unmasked", n: 11 },
+  { src: "photos/landing/15.jpg", r: 1.225, project: "sleeeep", n: 7 },
+  { src: "photos/landing/16.jpg", r: 1.262, project: "still-here", n: 8 },
 ];
 
 window.PROJECTS = [
