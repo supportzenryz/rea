@@ -25,7 +25,7 @@ const TYPES = {
 
 const store = new Map();
 const env = {
-  ENQUIRY_TO: "sundarrajanparamasivan@accademiaitaliana.it",
+  ENQUIRY_TO: "work.photosbysundar@gmail.com",
   ASSETS: {
     async fetch(request) {
       let p = decodeURIComponent(new URL(request.url).pathname);

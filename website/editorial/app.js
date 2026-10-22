@@ -35,7 +35,7 @@
   };
 
   const CONTACT = {
-    email: "sundarrajanparamasivan@accademiaitaliana.it",
+    email: "work.photosbysundar@gmail.com",
     instagram: { label: "@photosbysundar", href: "https://www.instagram.com/photosbysundar/" },
     based: "India — Europe",
   };
@@ -68,7 +68,7 @@
       .catch(() => {})
       .then(() => img);
     cache.set(src, ready);
-    while (cache.size > 16) cache.delete(cache.keys().next().value);
+    while (cache.size > 48) cache.delete(cache.keys().next().value);
     return ready;
   };
 
@@ -176,9 +176,11 @@
 
   // Hover previews wait a beat, so skimming the list does not flicker.
   let hoverTimer = 0;
+  let hoveringList = false;
   worksEl.addEventListener("pointerover", (e) => {
     const a = e.target.closest("a[data-id]");
     if (!a || stageEl.hidden) return;
+    hoveringList = true;
     clearTimeout(hoverTimer);
     hoverTimer = setTimeout(() => {
       const ph = byId[a.dataset.id].photos[0];
@@ -186,6 +188,7 @@
     }, 110);
   });
   worksEl.addEventListener("pointerleave", () => {
+    hoveringList = false;
     clearTimeout(hoverTimer);
     if (!stageEl.hidden) hoverTimer = setTimeout(showCurrent, 110);
   });
@@ -214,11 +217,19 @@
     else openPanel("works");
   });
 
+  // Thumbnails: inside a project, only that project's photographs; from the
+  // slideshow, every project grouped under its name.
+  document.querySelector('[data-view="thumbnails"]').addEventListener("click", (e) => {
+    e.preventDefault();
+    location.hash = viewing ? `#/thumbnails/${viewing.p.id}` : "#/thumbnails";
+  });
+
   // Back: return to where the project was opened from.
   let cameFrom = "home";
+  let thumbsReturn = "#/thumbnails";
   backEl.addEventListener("click", (e) => {
     e.preventDefault();
-    if (cameFrom === "thumbs") location.hash = "#/thumbnails";
+    if (cameFrom === "thumbs") location.hash = thumbsReturn;
     else {
       location.hash = "#/";
       if (cameFrom === "index") setTimeout(() => openPanel("works"), 140);
@@ -244,7 +255,8 @@
     clearTimeout(slideTimer);
     if (reduced) return;
     slideTimer = setTimeout(function next() {
-      if (introPlaying || isOpen() || route().name !== "landing") return (slideTimer = setTimeout(next, 1200));
+      // Keeps running beside the open Works list; pauses only while it is hovered.
+      if (introPlaying || hoveringList || route().name !== "landing") return (slideTimer = setTimeout(next, 1200));
       showSlide(slide + 1);
     }, 5600);
   };
@@ -341,29 +353,44 @@
 
   // Thumbnails ------------------------------------------------------------
 
-  let thumbsBuilt = false;
-  const buildThumbs = () => {
-    if (thumbsBuilt) return;
-    thumbsBuilt = true;
-    const io = new IntersectionObserver(
-      (entries) =>
-        entries.forEach((e) => {
-          if (!e.isIntersecting) return;
-          e.target.classList.add("is-in");
-          io.unobserve(e.target);
-        }),
-      { root: thumbsEl, rootMargin: "0px 0px -4% 0px" },
-    );
-    thumbsEl.innerHTML = PROJECTS.flatMap((p) =>
-      p.photos.map(
-        (ph, i) =>
-          `<a class="thumb" href="#/work/${p.id}/${i + 1}" data-cursor="${esc(p.title)}">` +
-          `<img src="${thumbOf(ph.src)}" alt="${esc(p.title)}" loading="lazy" decoding="async" draggable="false" /></a>`,
-      ),
-    ).join("");
-    thumbsEl.querySelectorAll(".thumb").forEach((t) => io.observe(t));
-    thumbsEl.addEventListener("click", (e) => e.target.closest(".thumb") && (cameFrom = "thumbs"));
+  // scope: a project id (that project only) or "" (every project, grouped).
+  let thumbsScope = null;
+  const thumbsIO = new IntersectionObserver(
+    (entries) =>
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        e.target.classList.add("is-in");
+        thumbsIO.unobserve(e.target);
+      }),
+    { root: thumbsEl, rootMargin: "0px 0px -4% 0px" },
+  );
+  const buildThumbs = (scope) => {
+    if (thumbsScope === scope) return;
+    thumbsScope = scope;
+    thumbsIO.disconnect();
+    const list = scope ? [byId[scope]] : PROJECTS;
+    thumbsEl.innerHTML = list
+      .map(
+        (p) =>
+          `<h2 class="thumbs-title">${esc(p.title)}</h2>` +
+          p.photos
+            .map(
+              (ph, i) =>
+                `<a class="thumb" href="#/work/${p.id}/${i + 1}" data-cursor="${esc(p.title)}">` +
+                `<img src="${thumbOf(ph.src)}" alt="${esc(p.title)}" loading="lazy" decoding="async" draggable="false" /></a>`,
+            )
+            .join(""),
+      )
+      .join("");
+    thumbsEl.scrollTop = 0;
+    thumbsScroll = 0;
+    thumbsEl.querySelectorAll(".thumb").forEach((t) => thumbsIO.observe(t));
   };
+  thumbsEl.addEventListener("click", (e) => {
+    if (!e.target.closest(".thumb")) return;
+    cameFrom = "thumbs";
+    thumbsReturn = location.hash;
+  });
 
   // Crossfade between the stage and the thumbnails instead of cutting.
   let viewToken = 0;
@@ -448,7 +475,7 @@
   const route = () => {
     const [a, b, c] = location.hash.replace(/^#\/?/, "").split("/");
     if (a === "work" && byId[b]) return { name: "project", p: byId[b], n: parseInt(c, 10) || 1 };
-    if (a === "thumbnails") return { name: "thumbnails" };
+    if (a === "thumbnails") return { name: "thumbnails", scope: byId[b] ? b : "" };
     const panel = { index: "works", info: "info", contact: "contact" }[a] || null;
     return { name: "landing", panel };
   };
@@ -467,9 +494,9 @@
         body.classList.remove("panel-open");
         fitStage();
       }
-      buildThumbs();
+      buildThumbs(r.scope);
       touchName.textContent = "";
-      document.title = "Thumbnails — Sundar Rajan";
+      document.title = r.scope ? `${byId[r.scope].title} — Thumbnails — Sundar Rajan` : "Thumbnails — Sundar Rajan";
     } else {
       lastStageHash = location.hash || "#/";
       if (r.name === "project") showProject(r.p, r.n);
@@ -563,48 +590,89 @@
   ]).catch(() => {});
   fontsReady.then(() => html.classList.remove("fonts-pending"));
 
-  // Opening: the name fades in alone, holds, then softly dissolves in place
-  // while the page clears to the slideshow. Once per visit (?intro replays).
+  // Opening: photographs cut fast in the centre while the name stays at the
+  // top; the last frame is the first slide, in exactly its place, so it hands
+  // over to the slideshow without a seam. Then the Works list slides in
+  // beside it. Once per visit; add ?intro to the URL to see it again.
 
   const intro = $("intro");
+  const introStage = $("intro-stage");
   let seen = false;
   try {
     seen = sessionStorage.getItem("sr-intro") === "1";
   } catch {}
-  const play = !reduced && (/[?&]intro\b/.test(location.search) || !seen) && route().name === "landing";
+  const firstRoute = route();
+  const play = !reduced && (/[?&]intro\b/.test(location.search) || !seen) && firstRoute.name === "landing";
+
+  // Arriving at the slideshow shows the work on the side.
+  const showWorkOnSide = () => {
+    if (route().name === "landing" && !isOpen()) openPanel("works");
+  };
 
   thumbsEl.hidden = true;
+  if (play) {
+    introPlaying = true;
+    body.classList.add("intro-playing");
+  }
   render();
 
   if (!play) {
     intro.remove();
+    if (firstRoute.name === "landing" && !firstRoute.panel) setTimeout(showWorkOnSide, 500);
   } else {
-    introPlaying = true;
-    const nameEl = $("intro-name");
-    let revealTimer = 0;
-    const reveal = () => {
-      if (intro.classList.contains("is-out")) return;
-      clearTimeout(revealTimer);
+    // Two frames from every project (the small copies decode fast), cut
+    // quicker and quicker, then easing off into the first slide.
+    const frames = [
+      ...PROJECTS.map((p) => p.photos[1] || p.photos[0]),
+      ...PROJECTS.map((p) => p.photos[p.photos.length - 1]),
+    ].map((ph) => thumbOf(ph.src));
+    const HOLD = [230, 180, 145, 120, 105, 95, 88, 84, 84, 88, 95, 105, 120, 145, 180, 220];
+    const timers = [];
+    let finished = false;
+
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      timers.forEach(clearTimeout);
       intro.classList.add("is-out");
-      setTimeout(() => {
-        intro.remove();
-        introPlaying = false;
-        if (route().name === "landing") schedule();
-      }, 1700);
+      body.classList.remove("intro-playing");
       try {
         sessionStorage.setItem("sr-intro", "1");
       } catch {}
+      setTimeout(() => {
+        intro.remove();
+        introPlaying = false;
+        if (route().name === "landing") {
+          schedule();
+          showWorkOnSide();
+        }
+      }, 480);
     };
-    const dissolve = () => {
-      nameEl.classList.add("is-dissolving");
-      revealTimer = setTimeout(reveal, 1800);
+
+    const cut = (img) => {
+      const el = img.cloneNode();
+      el.alt = "";
+      introStage.replaceChildren(el);
     };
-    fontsReady.then(() => requestAnimationFrame(() => intro.classList.add("is-in")));
-    Promise.race([
-      Promise.all([prepare(LANDING[0].src), fontsReady.then(() => wait(3400))]),
-      wait(7000),
-    ]).then(dissolve);
-    intro.addEventListener("click", reveal);
-    addEventListener("keydown", reveal, { once: true });
+    // Resolves to the decoded image if it is ready now, otherwise null.
+    const ready = (src) => Promise.race([prepare(src), wait(0).then(() => null)]);
+
+    // Start only once every frame is decoded (at most 4 s), so no cut stutters.
+    Promise.race([Promise.all([fontsReady, prepare(LANDING[0].src), ...frames.map(prepare)]), wait(4000)]).then(
+      async () => {
+        if (finished) return;
+        const imgs = (await Promise.all(frames.map(ready))).filter((i) => i && i.naturalWidth);
+        const last = await ready(LANDING[0].src);
+        let t = 120;
+        imgs.forEach((img, k) => {
+          timers.push(setTimeout(() => cut(img), t));
+          t += HOLD[k] ?? 100;
+        });
+        timers.push(setTimeout(() => last && last.naturalWidth && cut(last), t));
+        timers.push(setTimeout(finish, t + 650));
+      },
+    );
+    intro.addEventListener("click", finish);
+    addEventListener("keydown", finish, { once: true });
   }
 })();

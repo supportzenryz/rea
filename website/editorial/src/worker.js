@@ -84,7 +84,7 @@ function seoTags(origin) {
       description: BIO,
       url: home,
       image,
-      email: "mailto:sundarrajanparamasivan@accademiaitaliana.it",
+      email: "mailto:work.photosbysundar@gmail.com",
       sameAs: ["https://www.instagram.com/photosbysundar/"],
       workLocation: [
         { "@type": "Place", name: "India" },

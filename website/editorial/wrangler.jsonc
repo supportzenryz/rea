@@ -12,7 +12,7 @@
   },
   "vars": {
     // Where enquiries are emailed (when RESEND_API_KEY is set as a secret).
-    "ENQUIRY_TO": "sundarrajanparamasivan@accademiaitaliana.it"
+    "ENQUIRY_TO": "work.photosbysundar@gmail.com"
   },
   "observability": { "enabled": true }
 
