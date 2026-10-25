@@ -41,7 +41,9 @@ const SECURITY = {
   "X-Robots-Tag": "noindex, nofollow",
 };
 
-export async function adminApi(request, env, url) {
+export async function adminApi(request, env, url, ctx) {
+  // Emails finish after the answer (same timing whether or not one is sent).
+  const later = (p) => (ctx?.waitUntil ? ctx.waitUntil(p) : p);
   const route = url.pathname.replace(/^\/admin\/api\//, "");
   const method = request.method;
   if (!env.CONTENT) return json({ ok: false, error: "Storage is not connected yet (KV binding CONTENT)." }, 503);
@@ -52,13 +54,13 @@ export async function adminApi(request, env, url) {
 
   if (route === "login" && method === "POST") return login(request, env, url);
   if (route === "logout" && method === "POST") return json({ ok: true }, 200, { "Set-Cookie": clearCookie(url) });
-  if (route === "forgot" && method === "POST") return forgot(request, env, url);
-  if (route === "reset" && method === "POST") return reset(request, env, url);
+  if (route === "forgot" && method === "POST") return forgot(request, env, url, later);
+  if (route === "reset" && method === "POST") return reset(request, env, url, later);
 
   if (!(await signedIn(request, env, url))) return json({ ok: false, signedOut: true, error: "Please sign in." }, 401);
 
   if (route === "session" && method === "GET") return json({ ok: true });
-  if (route === "password" && method === "POST") return changePassword(request, env, url);
+  if (route === "password" && method === "POST") return changePassword(request, env, url, later);
   if (route === "signout-everywhere" && method === "POST") return signOutEverywhere(env, url);
   if (route === "content" && method === "GET") return json({ ok: true, content: await loadContent(env) });
   if (route === "content" && method === "PUT") return putContent(request, env);
@@ -124,13 +126,13 @@ async function passwordProblem(password) {
   return null;
 }
 
-async function changePassword(request, env, url) {
+async function changePassword(request, env, url, later) {
   const { current, next } = await body(request);
   if (!(await checkPassword(env, current))) return json({ ok: false, error: "The current password is not right." }, 401);
   const problem = await passwordProblem(next);
   if (problem) return json({ ok: false, error: problem }, 400);
   await setPassword(env, next);
-  await notifyPasswordChanged(env, url);
+  await later(notifyPasswordChanged(env, url));
   return json({ ok: true }, 200, { "Set-Cookie": await sessionCookie(env, url) });
 }
 
@@ -141,7 +143,7 @@ async function signOutEverywhere(env, url) {
 
 // Forgot password ------------------------------------------------------------
 
-async function forgot(request, env, url) {
+async function forgot(request, env, url, later) {
   const ip = visitor(request);
   const L = LIMITS.forgot;
   const done = json({ ok: true, message: "If email is set up, a sign-in link is on its way to the site owner's inbox. It works for 15 minutes." });
@@ -153,7 +155,7 @@ async function forgot(request, env, url) {
   const site = env.SITE_URL || url.origin;
   // The token is in the #fragment, so it never reaches a server log.
   const link = `${site}/admin/#reset=${token}`;
-  await sendMail(env, {
+  await later(sendMail(env, {
     subject: "Reset your website password",
     text:
       `Someone asked to reset the password for your website's admin.\n\n` +
@@ -164,11 +166,11 @@ async function forgot(request, env, url) {
       `<p>Someone asked to reset the password for your website's admin.</p>` +
       `<p><a href="${escapeHtml(link)}" style="color:#1a1a1a">Choose a new password</a> (works for 15 minutes).</p>` +
       `<p style="color:#888">If it wasn't you, ignore this email. Your password stays the same.</p></div>`,
-  });
+  }));
   return done;
 }
 
-async function reset(request, env, url) {
+async function reset(request, env, url, later) {
   const ip = visitor(request);
   if ((await count(env, `reset:try:${ip}`)) >= LIMITS.reset.perVisitor) {
     return json({ ok: false, error: "Too many attempts. Try again in 15 minutes." }, 429);
@@ -183,7 +185,7 @@ async function reset(request, env, url) {
   if (problem) return json({ ok: false, error: problem }, 400);
   await env.CONTENT.delete(key); // single use
   await setPassword(env, password);
-  await notifyPasswordChanged(env, url);
+  await later(notifyPasswordChanged(env, url));
   return json({ ok: true }, 200, { "Set-Cookie": await sessionCookie(env, url) });
 }
 

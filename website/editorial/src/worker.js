@@ -23,7 +23,7 @@ const BIO =
   "Sundar Rajan is a fashion photographer working between India and Europe. His work explores the relationship between fashion and the human experience, using clothing as a means of expressing identity, emotion and the complexities of being human.";
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     // One address for search engines: www.photosbysundar.com -> photosbysundar.com.
     if (url.hostname.startsWith("www.")) {
@@ -31,7 +31,7 @@ export default {
       return Response.redirect(url.toString(), 301);
     }
     const p = url.pathname;
-    if (p.startsWith("/admin/api/")) return adminApi(request, env, url);
+    if (p.startsWith("/admin/api/")) return adminApi(request, env, url, ctx);
     if (p === "/admin") return Response.redirect(`${url.origin}/admin/`, 301);
     if (p.startsWith("/admin/")) return adminAsset(request, env);
     if (/^\/(photos|medium|thumbs)\/[^/]+\/u-/.test(p)) {
@@ -39,7 +39,7 @@ export default {
     }
     switch (p) {
       case "/api/enquiry":
-        return enquiry(request, env, url);
+        return enquiry(request, env, url, ctx);
       case "/data.js":
         return data(request, env);
       case "/robots.txt":
@@ -177,7 +177,7 @@ function sitemap(origin) {
 
 // Enquiries -------------------------------------------------------------
 
-async function enquiry(request, env, url) {
+async function enquiry(request, env, url, ctx) {
   if (request.method !== "POST") {
     return json({ ok: false, error: "Method not allowed." }, 405, { Allow: "POST" });
   }
@@ -241,18 +241,18 @@ async function enquiry(request, env, url) {
     delivered = true;
   }
 
-  const sent = await sendMail(env, {
+  const mail = sendMail(env, {
     subject: `${d.type} enquiry — ${d.name}`,
-    text: `${d.message}
-
-${d.name}
-${d.email}
-
-Sent from the website, ${record.receivedAt}`,
+    text: `${d.message}\n\n${d.name}\n${d.email}\n\nSent from the website, ${record.receivedAt}`,
     html: emailHtml(record),
     replyTo: d.email,
   });
-  if (sent) delivered = true;
+  // Already kept: answer the visitor at once and finish the email afterwards.
+  if (delivered && ctx?.waitUntil) {
+    ctx.waitUntil(mail);
+    return json({ ok: true });
+  }
+  if (await mail) delivered = true;
 
   if (!delivered) return json({ ok: false, fallback: "mailto" }, 503);
   return json({ ok: true });
