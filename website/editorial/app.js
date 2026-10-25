@@ -229,11 +229,15 @@
     else openPanel("works");
   });
 
-  // Thumbnails, in three levels: a card for every project (its cover and
-  // name) -> that project's photographs -> one photograph.
+  // Thumbnails, in three levels: a card for every project (its cover) ->
+  // that project's photographs -> one photograph. From inside a project it
+  // opens straight on that project's photographs.
+  let thumbsFromProject = false;
   document.querySelector('[data-view="thumbnails"]').addEventListener("click", (e) => {
     e.preventDefault();
-    location.hash = "#/thumbnails";
+    const r = route();
+    thumbsFromProject = r.name === "project";
+    location.hash = thumbsFromProject ? `#/thumbnails/${r.p.id}` : "#/thumbnails";
   });
 
   // Back: up one level.
@@ -242,7 +246,10 @@
   backEl.addEventListener("click", (e) => {
     e.preventDefault();
     const r = route();
-    if (r.name === "thumbnails" && r.scope) location.hash = "#/thumbnails"; // photos -> project cards
+    if (r.name === "thumbnails" && r.scope && thumbsFromProject) {
+      thumbsFromProject = false;
+      location.hash = lastStageHash; // that project's photos -> the photo you were on
+    } else if (r.name === "thumbnails" && r.scope) location.hash = "#/thumbnails"; // photos -> project cards
     else if (r.name === "thumbnails") location.hash = lastStageHash; // cards -> where you were
     else if (cameFrom === "thumbs") location.hash = thumbsReturn; // one photo -> its project's photos
     else {
