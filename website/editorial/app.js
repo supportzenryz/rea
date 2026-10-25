@@ -41,6 +41,8 @@
   const esc = (s) =>
     String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const thumbOf = (src) => src.replace(/^photos\//, "thumbs/");
+  // A project's cover (chosen in /admin), else its first photograph.
+  const coverOf = (p) => p.photos.find((ph) => ph.src === p.cover) || p.photos[0];
   const isOpen = () => body.classList.contains("panel-open");
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -150,7 +152,7 @@
     (CONTACT.based ? `<dt>Based</dt><dd>${esc(CONTACT.based)}</dd>` : "") +
     `</dl>`;
 
-  const warmCovers = () => PROJECTS.forEach((p) => prepare(p.photos[0].src));
+  const warmCovers = () => PROJECTS.forEach((p) => prepare(coverOf(p).src));
 
   const setTab = (tab) => {
     document.querySelectorAll(".tabs [data-tab]").forEach((b) => b.classList.toggle("is-active", b.dataset.tab === tab));
@@ -189,7 +191,7 @@
     hoveringList = true;
     clearTimeout(hoverTimer);
     hoverTimer = setTimeout(() => {
-      const ph = byId[a.dataset.id].photos[0];
+      const ph = coverOf(byId[a.dataset.id]);
       show(ph.src, { r: ph.r, fade: FADE.preview });
     }, 110);
   });
@@ -406,7 +408,7 @@
         PROJECTS.map(
           (p) =>
             `<a class="thumb card" href="#/thumbnails/${p.id}" data-cursor="${esc(p.title)}" aria-label="${esc(p.title)}">` +
-            `${pic(p.photos[0].src, p.title)}</a>`,
+            `${pic(coverOf(p).src, p.title)}</a>`,
         ).join("");
     thumbsEl.scrollTop = 0;
     thumbsScroll = 0;

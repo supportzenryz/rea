@@ -160,3 +160,4 @@ select { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-r
 .frame-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; justify-self: stretch; align-items: end; }
 .frame[open] { gap: 12px; }
 @media (max-width: 560px) { .frame-row { grid-template-columns: 1fr; } }
+.icon[aria-pressed="true"] { background: var(--ink); color: #fff; }

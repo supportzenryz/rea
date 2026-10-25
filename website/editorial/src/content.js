@@ -58,7 +58,9 @@ export function cleanContent(input) {
       photos.push({ src: ph.src, r });
     }
     ids.add(id);
-    projects.push({ id, title, photos });
+    // The cover (its card in Thumbnails): one of its own photographs, else the first.
+    const cover = typeof p.cover === "string" && photos.some((ph) => ph.src === p.cover) ? p.cover : null;
+    projects.push({ id, title, photos, ...(cover && cover !== photos[0].src ? { cover } : {}) });
   }
 
   // Slideshow: a photograph from a project picks up its project and position

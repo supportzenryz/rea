@@ -270,6 +270,8 @@
   // Projects ------------------------------------------------------------------
 
   const inSlideshow = (src) => state.landing.some((s) => s.src === src);
+  // The project's card in Thumbnails: the chosen cover, else the first photograph.
+  const coverSrc = (p) => (p.photos.some((ph) => ph.src === p.cover) ? p.cover : p.photos[0]?.src);
 
   const renderProjectList = () => {
     $("project-list").replaceChildren(
@@ -340,12 +342,28 @@
           "li",
           { class: "tile", draggable: "true", "data-i": i },
           h("img", { src: thumb(ph.src), alt: "", loading: "lazy", draggable: "false" }),
-          i === 0 ? h("span", { class: "badge" }, "Cover") : null,
+          ph.src === coverSrc(p) ? h("span", { class: "badge" }, "Cover") : null,
           h(
             "span",
             { class: "tools" },
             h("button", { type: "button", class: "icon", "aria-label": "Move earlier", disabled: i === 0, onclick: () => (move(p.photos, i, i - 1), markDirty(), renderProject()) }, "←"),
             h("button", { type: "button", class: "icon", "aria-label": "Move later", disabled: i === p.photos.length - 1, onclick: () => (move(p.photos, i, i + 1), markDirty(), renderProject()) }, "→"),
+            h(
+              "button",
+              {
+                type: "button",
+                class: `icon${ph.src === coverSrc(p) ? " on" : ""}`,
+                "aria-label": ph.src === coverSrc(p) ? "This is the cover" : "Make this the cover",
+                title: ph.src === coverSrc(p) ? "The cover (its card in Thumbnails)" : "Make this the cover",
+                "aria-pressed": String(ph.src === coverSrc(p)),
+                onclick: () => {
+                  p.cover = ph.src;
+                  markDirty();
+                  renderProject();
+                },
+              },
+              "◉",
+            ),
             h(
               "button",
               {
@@ -371,6 +389,7 @@
                 onclick: () => {
                   if (!confirm("Remove this photograph from the project?")) return;
                   p.photos.splice(i, 1);
+                  if (p.cover === ph.src) delete p.cover;
                   state.landing = state.landing.filter((s) => s.src !== ph.src);
                   markDirty();
                   renderAll();
@@ -396,7 +415,7 @@
 
     box.replaceChildren(
       h("div", { class: "fields" }, h("label", {}, "Title", title), h("label", {}, "Address", h("span", { class: "addr" }, "/#/work/", idInput))),
-      h("p", { class: "hint" }, "Drag photographs to reorder, or drop files here to add them. The first one is the cover; ☆ puts one in the opening slideshow."),
+      h("p", { class: "hint" }, "Drag photographs to reorder, or drop files here to add them. ◉ makes a photograph the cover (its card in Thumbnails; the first one until you choose another). ☆ puts one in the opening slideshow."),
       grid,
       file,
       h(
