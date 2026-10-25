@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Admin — Sundar Rajan</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&display=swap" />
+    <link rel="stylesheet" href="/admin/admin.css" />
+    <!-- The content as the site has it now (used until the first save). -->
+    <script src="/data.js" defer></script>
+    <script src="/admin/admin.js" defer></script>
+  </head>
+  <body>
+    <main id="signin" class="signin" hidden>
+      <h1 class="brand">Sundar Rajan</h1>
+      <form id="signin-form" class="signin-form">
+        <label>Password<input id="password" type="password" autocomplete="current-password" required /></label>
+        <button type="submit" class="primary">Sign in</button>
+        <p id="signin-msg" class="msg" role="alert"></p>
+      </form>
+    </main>
+
+    <main id="setup" class="signin" hidden>
+      <h1 class="brand">Sundar Rajan</h1>
+      <p class="lede" id="setup-msg"></p>
+    </main>
+
+    <div id="app" class="app" hidden>
+      <header class="bar">
+        <a class="brand small" href="/" target="_blank" rel="noopener" title="Open the site">Sundar Rajan</a>
+        <nav class="tabs" aria-label="Sections">
+          <button type="button" data-tab="projects" aria-current="page">Projects</button>
+          <button type="button" data-tab="slideshow">Slideshow</button>
+          <button type="button" data-tab="info">Info</button>
+          <button type="button" data-tab="enquiries">Enquiries</button>
+        </nav>
+        <div class="actions">
+          <span id="status" class="status" aria-live="polite"></span>
+          <button type="button" id="undo" class="quiet" title="Go back to the version before the last save">Undo last save</button>
+          <button type="button" id="save" class="primary" disabled>Publish</button>
+          <button type="button" id="signout" class="quiet">Sign out</button>
+        </div>
+      </header>
+
+      <section id="tab-projects" class="tab projects">
+        <aside class="plist">
+          <ol id="project-list"></ol>
+          <button type="button" id="add-project" class="ghost">+ New project</button>
+        </aside>
+        <div id="project" class="project"></div>
+      </section>
+
+      <section id="tab-slideshow" class="tab" hidden>
+        <p class="hint">The opening slideshow, in order. Add photographs with ☆ on any photograph in a project.</p>
+        <ol id="slides" class="grid"></ol>
+      </section>
+
+      <section id="tab-info" class="tab info" hidden>
+        <label>Bio <small>Leave an empty line between paragraphs.</small><textarea id="bio" rows="12"></textarea></label>
+        <label>Email<input id="email" type="email" /></label>
+        <label>Instagram name<input id="instagram" type="text" placeholder="photosbysundar" /></label>
+        <label>Based<input id="based" type="text" placeholder="India — Europe" /></label>
+      </section>
+
+      <section id="tab-enquiries" class="tab" hidden>
+        <p class="hint">Every message sent from the contact form, newest first.</p>
+        <ol id="enquiries" class="enquiries"></ol>
+      </section>
+    </div>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+  </body>
+</html>

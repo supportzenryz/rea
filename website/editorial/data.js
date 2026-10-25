@@ -142,3 +142,15 @@ window.PROJECTS = [
     ],
   },
 ];
+
+window.SITE = {
+  bio: [
+    "Sundar Rajan is a fashion photographer working between India and Europe. His work explores the relationship between fashion and the human experience, using clothing as a means of expressing identity, emotion and the complexities of being human.",
+    "Drawn to the space between what is seen and what is felt, his images explore the tension between appearance and reality, the personal and the collective, and the worlds people inhabit and imagine. His practice approaches fashion as more than an expression of aesthetics, seeing it as a way to tell stories, question perceptions and explore the world around us.",
+  ],
+  contact: {
+    email: "work.photosbysundar@gmail.com",
+    instagram: { label: "@photosbysundar", href: "https://www.instagram.com/photosbysundar/" },
+    based: "India — Europe",
+  },
+};

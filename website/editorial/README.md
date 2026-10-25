@@ -1,7 +1,7 @@
 # Sundar Rajan — portfolio
 
 A minimal portfolio where the photographs carry the site: static HTML, CSS and
-JavaScript, plus a small Cloudflare Worker for enquiries and SEO.
+JavaScript, plus a small Cloudflare Worker for enquiries, SEO and the /admin editor.
 
 | Route                  | Page                                                     |
 | ---------------------- | -------------------------------------------------------- |
@@ -30,20 +30,37 @@ Build command: `exit 0`
 ## Enquiries
 
 The form posts to `/api/enquiry`, which checks the input, quietly drops bots
-(hidden field, too-fast submissions) and then:
+(hidden field, too-fast submissions), rate-limits senders (5 an hour), keeps a
+copy in KV (listed in /admin → Enquiries) and emails it to `ENQUIRY_TO`
+through Cloudflare Email (the address must be verified in the domain's Email
+Routing). With no storage and no email set up, the API answers 503 and the page
+opens the visitor's email app with the enquiry filled in, so nothing is lost.
 
-1. **Emails it** to `ENQUIRY_TO` (in `wrangler.jsonc`) through
-   [Resend](https://resend.com), once a `RESEND_API_KEY` secret is added in
-   Cloudflare (Worker → Settings → Variables and Secrets).
-2. **Keeps a copy** and rate-limits senders (5 an hour), once a KV namespace
-   is bound as `ENQUIRIES` (see `wrangler.jsonc`).
+## Admin (/admin)
 
-Until one of those is set up, the API answers 503 and the page opens the
-visitor's email app with the enquiry filled in, so nothing is lost.
+`/admin` edits the site without touching code: projects (add, rename,
+reorder, delete), their photographs (upload, reorder by dragging, remove, pick
+the cover), the opening slideshow (☆ on any photograph), the bio and contact
+details, and the enquiries. Nothing changes on the site until **Publish**;
+**Undo last save** goes back one version.
 
-## Editing
+- Sign-in: one password, the secret `ADMIN_PASSWORD` (Cloudflare → Worker →
+  Settings → Variables and Secrets). Changing it signs everyone out. Sessions
+  last 12 hours; 8 wrong tries lock sign-in for 15 minutes.
+- Storage: the KV namespace bound as `CONTENT`. Saved content replaces
+  `data.js` (served by the Worker); uploaded photographs are resized in the
+  browser to 2000/1200/700 px, JPEG and WebP, and served from KV at the usual
+  `photos/`, `medium/` and `thumbs/` addresses. Photographs no longer used are
+  deleted two publishes later (kept for undo).
+- Free-plan limits that matter: 1,000 KV writes a day (one photograph is 6
+  writes, one publish 3), 1 GB of storage.
+- Code: `admin/` (page), `src/admin.js` (sign-in, API), `src/content.js`
+  (checks, storage, data.js).
+- Locally: `ADMIN_PASSWORD=anything node dev.mjs`, then open
+  http://localhost:4176/admin/ (content is kept in memory).
 
-- `data.js` lists every photograph and its ratio; regenerate it after adding
-  or removing photographs. Add a 700px copy to `thumbs/` (same folder and
-  name) for each new project photograph.
-- `app.js` holds the bio and contact details (`BIO`, `CONTACT`).
+## Editing without the admin
+
+Until the first publish in /admin the site uses the static `data.js` (every
+photograph, its ratio, the bio and contact details). After that, /admin is the
+source of truth and `data.js` is only the fallback.

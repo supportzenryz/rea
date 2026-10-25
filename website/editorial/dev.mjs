@@ -1,7 +1,7 @@
 // Local preview that runs the real Worker (src/worker.js) in Node:
 //   node dev.mjs [port]      -> http://localhost:4176
-// Enquiries are kept in memory and printed here; set NO_KV=1 to try the
-// "not set up yet" path (the page then opens the email app instead).
+// Content, uploads and enquiries are kept in memory (enquiries are printed
+// here). Set ADMIN_PASSWORD to try /admin; NO_KV=1 runs with no storage.
 
 import http from "node:http";
 import fs from "node:fs/promises";
@@ -45,16 +45,28 @@ const env = {
       }
     },
   },
-  ENQUIRIES: process.env.NO_KV
-    ? undefined
-    : {
-        get: async (k) => store.get(k) ?? null,
-        put: async (k, v) => {
-          store.set(k, v);
-          if (k.startsWith("enquiry:")) console.log("Enquiry received:", v);
-        },
-      },
+  // The admin's password here comes from the environment: ADMIN_PASSWORD=... node dev.mjs
+  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+  CONTENT: process.env.NO_KV ? undefined : memoryKV(store),
 };
+
+// Enough of Workers KV for local use (kept in memory until the process ends).
+function memoryKV(m) {
+  const read = (v, type) => (v == null ? null : type === "arrayBuffer" ? v.value : typeof v.value === "string" ? v.value : Buffer.from(v.value).toString());
+  return {
+    get: async (k, opts) => read(m.get(k), typeof opts === "string" ? opts : opts?.type),
+    getWithMetadata: async (k, opts) => ({ value: read(m.get(k), opts?.type), metadata: m.get(k)?.metadata ?? null }),
+    put: async (k, value, opts = {}) => {
+      m.set(k, { value: value instanceof ArrayBuffer ? value : value, metadata: opts.metadata ?? null });
+      if (k.startsWith("enquiry:")) console.log("Enquiry received:", value);
+    },
+    delete: async (k) => void m.delete(k),
+    list: async ({ prefix = "", limit = 1000 } = {}) => ({
+      keys: [...m.keys()].filter((k) => k.startsWith(prefix)).sort().slice(0, limit).map((name) => ({ name })),
+      list_complete: true,
+    }),
+  };
+}
 
 http
   .createServer(async (req, res) => {

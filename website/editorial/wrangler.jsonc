@@ -20,9 +20,9 @@
   // Cloudflare Email: sends only to ENQUIRY_TO, which must be a verified
   // destination address in the domain's Email Routing.
   "send_email": [{ "name": "MAILER", "destination_address": "work.photosbysundar@gmail.com" }],
+  // Content edited in /admin, uploaded photographs, enquiries and rate limits.
+  // /admin also needs the secret ADMIN_PASSWORD (set in the Cloudflare
+  // dashboard: Worker > Settings > Variables and Secrets).
+  "kv_namespaces": [{ "binding": "CONTENT", "id": "55a5c819b7594469a253133f3edaccd5" }],
   "observability": { "enabled": true }
-
-  // Optional, to keep a copy of every enquiry and rate-limit senders:
-  // run `npx wrangler kv namespace create ENQUIRIES` and paste the id here.
-  // "kv_namespaces": [{ "binding": "ENQUIRIES", "id": "<id>" }]
 }

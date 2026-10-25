@@ -34,16 +34,9 @@
     preview: { out: 220, in: 460 },
   };
 
-  const CONTACT = {
-    email: "work.photosbysundar@gmail.com",
-    instagram: { label: "@photosbysundar", href: "https://www.instagram.com/photosbysundar/" },
-    based: "India — Europe",
-  };
-
-  const BIO = [
-    "Sundar Rajan is a fashion photographer working between India and Europe. His work explores the relationship between fashion and the human experience, using clothing as a means of expressing identity, emotion and the complexities of being human.",
-    "Drawn to the space between what is seen and what is felt, his images explore the tension between appearance and reality, the personal and the collective, and the worlds people inhabit and imagine. His practice approaches fashion as more than an expression of aesthetics, seeing it as a way to tell stories, question perceptions and explore the world around us.",
-  ];
+  // Bio and contact details come from data.js (edited in /admin).
+  const CONTACT = window.SITE.contact;
+  const BIO = window.SITE.bio;
 
   const esc = (s) =>
     String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -150,9 +143,11 @@
   infoEl.innerHTML =
     BIO.map((t) => `<p>${esc(t)}</p>`).join("") +
     `<dl>` +
-    `<dt>Email</dt><dd><a href="mailto:${CONTACT.email}">${esc(CONTACT.email)}</a></dd>` +
-    `<dt>Instagram</dt><dd><a href="${CONTACT.instagram.href}" target="_blank" rel="noopener">${esc(CONTACT.instagram.label)}</a></dd>` +
-    `<dt>Based</dt><dd>${esc(CONTACT.based)}</dd>` +
+    `<dt>Email</dt><dd><a href="mailto:${esc(CONTACT.email)}">${esc(CONTACT.email)}</a></dd>` +
+    (CONTACT.instagram
+      ? `<dt>Instagram</dt><dd><a href="${esc(CONTACT.instagram.href)}" target="_blank" rel="noopener">${esc(CONTACT.instagram.label)}</a></dd>`
+      : "") +
+    (CONTACT.based ? `<dt>Based</dt><dd>${esc(CONTACT.based)}</dd>` : "") +
     `</dl>`;
 
   const warmCovers = () => PROJECTS.forEach((p) => prepare(p.photos[0].src));

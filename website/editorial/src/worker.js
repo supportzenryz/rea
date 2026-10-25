@@ -5,9 +5,14 @@
 //   whichever domain the site is served from, and serves robots.txt and
 //   sitemap.xml for it.
 // - POST /api/enquiry: checks an enquiry, quietly drops bots, then emails it
-//   (Resend, if RESEND_API_KEY is set) and/or stores it (KV, if ENQUIRIES is
-//   bound). With neither set up it answers 503, and the page falls back to
+//   (Cloudflare Email, or Resend if RESEND_API_KEY is set) and stores it (KV,
+//   CONTENT). With nothing set up it answers 503, and the page falls back to
 //   opening the visitor's email app, so no enquiry is lost.
+// - /admin: the content editor (see admin.js and content.js). Saved content
+//   replaces the static data.js; uploaded photographs are served from KV.
+
+import { adminApi } from "./admin.js";
+import { dataScript, getImage, loadContent } from "./content.js";
 
 const MAX_BODY = 12_000;
 const TYPES = ["Commission", "Editorial", "Collaboration", "Other"];
@@ -24,11 +29,20 @@ export default {
       url.hostname = url.hostname.slice(4);
       return Response.redirect(url.toString(), 301);
     }
-    switch (url.pathname) {
+    const p = url.pathname;
+    if (p.startsWith("/admin/api/")) return adminApi(request, env, url);
+    if (p === "/admin") return Response.redirect(`${url.origin}/admin/`, 301);
+    if (p.startsWith("/admin/")) return adminAsset(request, env);
+    if (/^\/(photos|medium|thumbs)\/[^/]+\/u-/.test(p)) {
+      return (await getImage(env, p.slice(1))) || env.ASSETS.fetch(request);
+    }
+    switch (p) {
       case "/api/enquiry":
         return enquiry(request, env, url);
+      case "/data.js":
+        return data(request, env);
       case "/robots.txt":
-        return plain(`User-agent: *\nAllow: /\n\nSitemap: ${url.origin}/sitemap.xml\n`, "text/plain");
+        return plain(`User-agent: *\nAllow: /\nDisallow: /admin/\n\nSitemap: ${url.origin}/sitemap.xml\n`, "text/plain");
       case "/sitemap.xml":
         return plain(sitemap(url.origin), "application/xml");
       case "/":
@@ -39,6 +53,30 @@ export default {
     }
   },
 };
+
+// The site's content: what was saved in /admin, else the static data.js.
+async function data(request, env) {
+  const content = await loadContent(env);
+  if (!content) return env.ASSETS.fetch(request);
+  return new Response(dataScript(content), {
+    headers: { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" },
+  });
+}
+
+// The admin page's own files: never indexed, never framed, always fresh.
+async function adminAsset(request, env) {
+  const asset = await env.ASSETS.fetch(request);
+  const headers = new Headers(asset.headers);
+  headers.set("Cache-Control", "no-cache");
+  headers.set("X-Robots-Tag", "noindex, nofollow");
+  headers.set(
+    "Content-Security-Policy",
+    "default-src 'self'; img-src 'self' blob: data:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'; frame-ancestors 'none'",
+  );
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("Referrer-Policy", "no-referrer");
+  return new Response(asset.body, { status: asset.status, headers });
+}
 
 // Page ------------------------------------------------------------------
 
@@ -67,7 +105,16 @@ async function page(request, env, url) {
   }
   const asset = await env.ASSETS.fetch(new Request(new URL("/", url), request));
   if (!asset.ok) return asset;
-  const html = (await asset.text()).replace("<!--seo-->", seoTags(url.origin));
+  const content = await loadContent(env);
+  let html = (await asset.text()).replace("<!--seo-->", seoTags(url.origin, content));
+  // The first slide is preloaded; follow the slideshow saved in /admin.
+  const first = content?.landing?.[0]?.src;
+  if (first) {
+    const webp = `/${first.replace(/\.jpg$/, ".webp")}`;
+    html = html
+      .replace('href="/medium/landing/01.webp"', `href="${webp.replace(/^\/photos\//, "/medium/")}"`)
+      .replace('href="/photos/landing/01.webp"', `href="${webp}"`);
+  }
   const headers = new Headers(asset.headers);
   headers.set("Content-Type", "text/html; charset=utf-8");
   // Always revalidate the page, so a new deploy shows at once.
@@ -78,20 +125,22 @@ async function page(request, env, url) {
   return new Response(request.method === "HEAD" ? null : html, { status: 200, headers });
 }
 
-function seoTags(origin) {
+function seoTags(origin, content) {
   const home = `${origin}/`;
-  const image = `${origin}/photos/landing/01.jpg`;
+  const image = `${origin}/${content?.landing?.[0]?.src || "photos/landing/01.jpg"}`;
+  const email = content?.contact?.email || "work.photosbysundar@gmail.com";
+  const instagram = content ? content.contact.instagram : "photosbysundar";
   const data = [
     {
       "@context": "https://schema.org",
       "@type": "Person",
       name: "Sundar Rajan",
       jobTitle: "Fashion Photographer",
-      description: BIO,
+      description: content?.bio?.[0] || BIO,
       url: home,
       image,
-      email: "mailto:work.photosbysundar@gmail.com",
-      sameAs: ["https://www.instagram.com/photosbysundar/"],
+      email: `mailto:${email}`,
+      sameAs: instagram ? [`https://www.instagram.com/${instagram}/`] : [],
       workLocation: [
         { "@type": "Place", name: "India" },
         { "@type": "Place", name: "Europe" },
@@ -162,22 +211,23 @@ async function enquiry(request, env, url) {
   if (d.message.length < 10) missing.push("a short message");
   if (missing.length) return json({ ok: false, error: `Please add ${missing.join(", ")}.` }, 400);
 
-  // Rate limit per visitor (needs KV).
+  // Rate limit per visitor, and a copy of every enquiry (shown in /admin).
+  const store = env.ENQUIRIES || env.CONTENT;
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-  if (env.ENQUIRIES) {
+  if (store) {
     const key = `rate:${ip}`;
-    const count = Number(await env.ENQUIRIES.get(key)) || 0;
+    const count = Number(await store.get(key)) || 0;
     if (count >= RATE_LIMIT.max) {
       return json({ ok: false, error: "Too many messages for now. Please try again later." }, 429);
     }
-    await env.ENQUIRIES.put(key, String(count + 1), { expirationTtl: RATE_LIMIT.windowSeconds });
+    await store.put(key, String(count + 1), { expirationTtl: RATE_LIMIT.windowSeconds });
   }
 
   const record = { ...d, receivedAt: new Date().toISOString(), country: request.cf?.country || null };
   let delivered = false;
 
-  if (env.ENQUIRIES) {
-    await env.ENQUIRIES.put(`enquiry:${record.receivedAt}:${crypto.randomUUID()}`, JSON.stringify(record), {
+  if (store) {
+    await store.put(`enquiry:${record.receivedAt}:${crypto.randomUUID()}`, JSON.stringify(record), {
       expirationTtl: 60 * 60 * 24 * 365,
     });
     delivered = true;
