@@ -191,7 +191,7 @@ async function enquiry(request, env, url) {
       await env.MAILER.send(new EmailMessage(env.MAIL_FROM, env.ENQUIRY_TO, mime(env.MAIL_FROM, env.ENQUIRY_TO, d, record)));
       delivered = true;
     } catch (err) {
-      console.error("Cloudflare Email refused the enquiry", err);
+      console.error("Cloudflare Email refused the enquiry:", err?.message || String(err));
     }
   }
 
