@@ -39,6 +39,6 @@
   // Content edited in /admin, uploaded photographs, enquiries and rate limits.
   // /admin also needs the secret ADMIN_PASSWORD (set in the Cloudflare
   // dashboard: Worker > Settings > Variables and Secrets).
-  "kv_namespaces": [{ "binding": "CONTENT", "id": "55a5c819b7594469a253133f3edaccd5" }],
+  "kv_namespaces": [{ "binding": "CONTENT", "id": "98d4c20d6f2b409299a0c291840e3298" }],
   "observability": { "enabled": true }
 }
