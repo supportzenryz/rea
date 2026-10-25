@@ -153,8 +153,7 @@
     `<dt>Email</dt><dd><a href="mailto:${CONTACT.email}">${esc(CONTACT.email)}</a></dd>` +
     `<dt>Instagram</dt><dd><a href="${CONTACT.instagram.href}" target="_blank" rel="noopener">${esc(CONTACT.instagram.label)}</a></dd>` +
     `<dt>Based</dt><dd>${esc(CONTACT.based)}</dd>` +
-    `</dl>` +
-    `<p class="to-contact"><button type="button" data-tab="contact">Get in touch →</button></p>`;
+    `</dl>`;
 
   const warmCovers = () => PROJECTS.forEach((p) => prepare(p.photos[0].src));
 
@@ -233,24 +232,22 @@
     else openPanel("works");
   });
 
-  // Thumbnails: inside a project, only that project's photographs; from the
-  // slideshow, every project grouped under its name.
+  // Thumbnails, in three levels: a card for every project (its cover and
+  // name) -> that project's photographs -> one photograph.
   document.querySelector('[data-view="thumbnails"]').addEventListener("click", (e) => {
     e.preventDefault();
-    // In a project, or on a slideshow photo (each belongs to a project), show
-    // only that project's thumbnails.
-    const id = viewing ? viewing.p.id : LANDING[slide].project;
-    location.hash = id && byId[id] ? `#/thumbnails/${id}` : "#/thumbnails";
+    location.hash = "#/thumbnails";
   });
 
-  // Back: return to where the project was opened from.
+  // Back: up one level.
   let cameFrom = "home";
   let thumbsReturn = "#/thumbnails";
   backEl.addEventListener("click", (e) => {
     e.preventDefault();
-    // From Thumbnails: back to the slideshow photo or project it was opened from.
-    if (route().name === "thumbnails") location.hash = lastStageHash;
-    else if (cameFrom === "thumbs") location.hash = thumbsReturn;
+    const r = route();
+    if (r.name === "thumbnails" && r.scope) location.hash = "#/thumbnails"; // photos -> project cards
+    else if (r.name === "thumbnails") location.hash = lastStageHash; // cards -> where you were
+    else if (cameFrom === "thumbs") location.hash = thumbsReturn; // one photo -> its project's photos
     else {
       location.hash = "#/";
       if (cameFrom === "index") setTimeout(() => openPanel("works"), 140);
@@ -398,29 +395,31 @@
     if (thumbsScope === scope) return;
     thumbsScope = scope;
     thumbsIO.disconnect();
-    const list = scope ? [byId[scope]] : PROJECTS;
-    thumbsEl.innerHTML = list
-      .map(
-        (p) =>
-          // One project: photographs only. Every project: a name between groups.
-          (scope ? "" : `<h2 class="thumbs-title">${esc(p.title)}</h2>`) +
-          p.photos
-            .map(
-              (ph, i) =>
-                `<a class="thumb" href="#/work/${p.id}/${i + 1}" data-cursor="${esc(p.title)}">` +
-                // WebP where supported, JPEG otherwise: the browser picks.
-                `<picture><source type="image/webp" srcset="${thumbOf(ph.src).replace(/\.jpg$/, ".webp")}" />` +
-                `<img src="${thumbOf(ph.src)}" alt="${esc(p.title)}" loading="lazy" decoding="async" draggable="false" /></picture></a>`,
-            )
-            .join(""),
-      )
-      .join("");
+    // WebP where supported, JPEG otherwise: the browser picks.
+    const pic = (src, alt) =>
+      `<picture><source type="image/webp" srcset="${thumbOf(src).replace(/\.jpg$/, ".webp")}" />` +
+      `<img src="${thumbOf(src)}" alt="${esc(alt)}" loading="lazy" decoding="async" draggable="false" /></picture>`;
+    thumbsEl.innerHTML = scope
+      ? // One project: its photographs; each opens on its own.
+        byId[scope].photos
+          .map(
+            (ph, i) =>
+              `<a class="thumb" href="#/work/${scope}/${i + 1}" data-cursor="${esc(byId[scope].title)}">${pic(ph.src, byId[scope].title)}</a>`,
+          )
+          .join("")
+      : // Every project: one card each, with its cover and name.
+        PROJECTS.map(
+          (p) =>
+            `<a class="thumb card" href="#/thumbnails/${p.id}" data-cursor="${esc(p.title)}">` +
+            `<span class="card-photo">${pic(p.photos[0].src, p.title)}</span>` +
+            `<span class="card-name">${esc(p.title)}</span></a>`,
+        ).join("");
     thumbsEl.scrollTop = 0;
     thumbsScroll = 0;
     thumbsEl.querySelectorAll(".thumb").forEach((t) => thumbsIO.observe(t));
   };
   thumbsEl.addEventListener("click", (e) => {
-    if (!e.target.closest(".thumb")) return;
+    if (!e.target.closest(".thumb:not(.card)")) return; // a photograph, not a project card
     cameFrom = "thumbs";
     thumbsReturn = location.hash;
   });
@@ -531,7 +530,7 @@
       touchName.textContent = "";
       document.title = r.scope ? `${byId[r.scope].title} — Thumbnails — Sundar Rajan` : "Thumbnails — Sundar Rajan";
     } else {
-      lastStageHash = location.hash || "#/";
+      if (cameFrom !== "thumbs") lastStageHash = location.hash || "#/";
       if (r.name === "project") showProject(r.p, r.n);
       else {
         viewing = null;
@@ -662,9 +661,10 @@
     // load fast), cut quicker and quicker, then easing off.
     const frames = [
       ...PROJECTS.map((p) => p.photos[1] || p.photos[0]),
-      ...PROJECTS.slice(0, 4).map((p) => p.photos[p.photos.length - 1]),
+      ...PROJECTS.slice(0, 5).map((p) => p.photos[p.photos.length - 1]),
     ].map((ph) => thumbOf(ph.src));
-    const HOLD = [230, 170, 130, 105, 92, 86, 86, 92, 105, 130, 170, 220];
+    // Same pace as the reference site (measured): a steady ~260 ms per photo.
+    const HOLD = Array(13).fill(260);
     const timers = [];
     let finished = false;
     const nameEl = $("intro-name");
@@ -700,9 +700,9 @@
       introStage.replaceChildren(el);
     };
 
-    // The cuts start once the first three frames are in (at most 1.5 s).
-    const firstThree = Promise.all(frames.slice(0, 3).map(prepare));
-    Promise.race([Promise.all([fontsReady, firstThree]), wait(1500)]).then(() => {
+    // The cuts start once every frame is in (small copies; at most 2.5 s).
+    const allFrames = Promise.all(frames.map(prepare));
+    Promise.race([Promise.all([fontsReady, allFrames]), wait(2500)]).then(() => {
       if (finished) return;
       let t = 0;
       // 1. Fast cuts.
