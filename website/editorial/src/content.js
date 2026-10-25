@@ -62,7 +62,8 @@ export function cleanContent(input) {
   }
 
   // Slideshow: a photograph from a project picks up its project and position
-  // from where it now sits; an older stand-alone copy keeps its link if valid.
+  // from where it now sits; a stand-alone slide (uploaded or reframed) keeps
+  // the project it is linked to, if that project exists.
   const where = new Map();
   projects.forEach((p) => p.photos.forEach((ph, i) => where.set(ph.src, { project: p.id, n: i + 1 })));
   if (!Array.isArray(input.landing) || !input.landing.length) return { error: "Choose at least one slideshow photograph." };
@@ -73,7 +74,8 @@ export function cleanContent(input) {
     if (!SRC.test(s?.src || "") || !r) return { error: "A slideshow photograph is not valid." };
     const at = where.get(s.src);
     const own = projects.find((p) => p.id === s.project);
-    const link = at || (own && Number.isInteger(s.n) && s.n >= 1 && s.n <= own.photos.length ? { project: own.id, n: s.n } : {});
+    const validN = own && Number.isInteger(s.n) && s.n >= 1 && s.n <= own.photos.length;
+    const link = at || (own ? { project: own.id, ...(validN ? { n: s.n } : {}) } : {});
     landing.push({ src: s.src, r, ...link });
   }
 

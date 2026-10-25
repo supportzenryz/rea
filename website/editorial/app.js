@@ -402,12 +402,11 @@
               `<a class="thumb" href="#/work/${scope}/${i + 1}" data-cursor="${esc(byId[scope].title)}">${pic(ph.src, byId[scope].title)}</a>`,
           )
           .join("")
-      : // Every project: one card each, with its cover and name.
+      : // Every project: one card each, its cover (the name shows on hover).
         PROJECTS.map(
           (p) =>
-            `<a class="thumb card" href="#/thumbnails/${p.id}" data-cursor="${esc(p.title)}">` +
-            `<span class="card-photo">${pic(p.photos[0].src, p.title)}</span>` +
-            `<span class="card-name">${esc(p.title)}</span></a>`,
+            `<a class="thumb card" href="#/thumbnails/${p.id}" data-cursor="${esc(p.title)}" aria-label="${esc(p.title)}">` +
+            `${pic(p.photos[0].src, p.title)}</a>`,
         ).join("");
     thumbsEl.scrollTop = 0;
     thumbsScroll = 0;

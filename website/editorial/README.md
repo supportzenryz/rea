@@ -46,7 +46,8 @@ opens the visitor's email app with the enquiry filled in, so nothing is lost.
 
 `/admin` edits the site without touching code: projects (add, rename,
 reorder, delete), their photographs (upload, reorder by dragging, remove, pick
-the cover), the opening slideshow (☆ on any photograph), the bio and contact
+the cover), the opening slideshow (☆ on any photograph, or upload straight
+into it; ⤢ reframes a slide: shape, zoom and position), the bio and contact
 details, and the enquiries. Nothing changes on the site until **Publish**;
 **Undo last save** goes back one version.
 

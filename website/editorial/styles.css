@@ -557,30 +557,6 @@ body.panel-open .panel {
   object-fit: contain;
 }
 
-/* Project cards: the cover above, the name below, in the same even grid. */
-.thumb.card {
-  flex-direction: column;
-  gap: 12px;
-}
-
-.card-photo {
-  display: flex;
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-  align-items: center;
-  justify-content: center;
-}
-
-.card-name {
-  font-size: 15px;
-  letter-spacing: 0.06em;
-  transition: opacity 0.3s ease;
-}
-
-.thumb.card:hover .card-name {
-  opacity: 0.6;
-}
 
 /* Cursor: dot and name in difference blend, light over photographs and dark
    over the page. Invisible until the pointer first moves. */
