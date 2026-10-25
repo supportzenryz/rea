@@ -630,16 +630,13 @@
   //   2. a clean white page with only the name in the centre;
   //   3. the name dissolves in place;
   //   4. the page clears to the regular slideshow, and the Works list slides in.
-  // Once per visit; add ?intro to the URL to see it again.
+  // Every time the landing page loads (a refresh included); not for visitors
+  // who ask for reduced motion, nor when a link opens a project directly.
 
   const intro = $("intro");
   const introStage = $("intro-stage");
-  let seen = false;
-  try {
-    seen = sessionStorage.getItem("sr-intro") === "1";
-  } catch {}
   const firstRoute = route();
-  const play = !reduced && (/[?&]intro\b/.test(location.search) || !seen) && firstRoute.name === "landing";
+  const play = !reduced && firstRoute.name === "landing";
 
   // Arriving at the slideshow shows the work on the side.
   const showWorkOnSide = () => {
@@ -683,9 +680,6 @@
       timers.forEach(clearTimeout);
       intro.classList.add("is-out");
       body.classList.remove("intro-playing");
-      try {
-        sessionStorage.setItem("sr-intro", "1");
-      } catch {}
       setTimeout(() => {
         intro.remove();
         introPlaying = false;
