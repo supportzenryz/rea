@@ -37,7 +37,11 @@
     "ENQUIRY_TO": "work.photosbysundar@gmail.com",
     "MAIL_FROM": "enquiries@photosbysundar.com",
     // The address used in emailed sign-in links (never taken from a request).
-    "SITE_URL": "https://photosbysundar.com"
+    "SITE_URL": "https://photosbysundar.com",
+    // Google Analytics 4 (property photosbysundar.com in Sundar's Google
+    // account). consent.js uses it, with every kind of storage denied until
+    // a visitor accepts. Remove to turn analytics off.
+    "GA_ID": "G-8PEYKXG90G"
   },
   // Cloudflare Email: sends only to ENQUIRY_TO, which must be a verified
   // destination address in the domain's Email Routing.
