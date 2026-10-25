@@ -17,6 +17,10 @@ export const UPLOAD_PATH = /^(photos|medium|thumbs)\/[a-z0-9-]{1,60}\/u-[a-z0-9]
 const MAX_PROJECTS = 60;
 const MAX_PHOTOS = 120;
 const MAX_LANDING = 60;
+// The opening (fast cuts before the name): 3 to 40 photographs, 100 to
+// 1000 ms each. The regular slideshow: 2 to 15 seconds per slide.
+export const OPENING = { min: 3, max: 40, pace: { min: 100, max: 1000, auto: 260 } };
+export const SLIDE_PACE = { min: 2000, max: 15000, auto: 5600 };
 
 const kv = (env) => env.CONTENT || null;
 
@@ -90,7 +94,33 @@ export function cleanContent(input) {
   if (instagram && !/^[A-Za-z0-9._]{1,30}$/.test(instagram)) return { error: "The Instagram name is not valid." };
   const based = text(c.based, 80);
 
-  return { content: { projects, landing, bio, contact: { email, instagram, based } } };
+  // Timing and the opening's photographs. Left out = the site's automatic
+  // choice (frames picked from the projects, 260 ms each; 5.6 s per slide).
+  const whole = (v, { min, max }) => (Number.isFinite(v) ? Math.round(Math.min(max, Math.max(min, v))) : null);
+  const timing = {};
+  const o = input.opening && typeof input.opening === "object" ? input.opening : {};
+  const pace = whole(o.pace, OPENING.pace);
+  let opening = null;
+  if (Array.isArray(o.frames) && o.frames.length) {
+    if (o.frames.length < OPENING.min) return { error: `The opening needs at least ${OPENING.min} photographs.` };
+    if (o.frames.length > OPENING.max) return { error: `The opening can have at most ${OPENING.max} photographs.` };
+    if (!o.frames.every((f) => typeof f === "string" && SRC.test(f))) return { error: "An opening photograph is not valid." };
+    opening = { frames: [...o.frames] };
+  }
+  if (pace !== null && pace !== OPENING.pace.auto) opening = { ...(opening || {}), pace };
+  const slidePace = whole(input.slidePace, SLIDE_PACE);
+  if (slidePace !== null && slidePace !== SLIDE_PACE.auto) timing.slidePace = slidePace;
+
+  return {
+    content: {
+      projects,
+      landing,
+      bio,
+      contact: { email, instagram, based },
+      ...(opening ? { opening } : {}),
+      ...timing,
+    },
+  };
 }
 
 // The site's data.js, built from saved content.
@@ -107,7 +137,8 @@ export function dataScript(c) {
     `// Generated from the content saved in /admin.\n` +
     `window.LANDING = ${js(c.landing)};\n` +
     `window.PROJECTS = ${js(c.projects)};\n` +
-    `window.SITE = ${js({ bio: c.bio, contact })};\n`
+    `window.SITE = ${js({ bio: c.bio, contact, ...(c.slidePace ? { slidePace: c.slidePace } : {}) })};\n` +
+    (c.opening ? `window.OPENING = ${js(c.opening)};\n` : "")
   );
 }
 
@@ -124,6 +155,7 @@ export function uploadedFiles(c) {
   };
   c?.projects?.forEach((p) => p.photos.forEach((ph) => add(ph.src)));
   c?.landing?.forEach((s) => add(s.src));
+  c?.opening?.frames?.forEach(add);
   return files;
 }
 

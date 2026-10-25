@@ -280,7 +280,7 @@
       // Keeps running beside the open Works list; pauses only while it is hovered.
       if (introPlaying || hoveringList || route().name !== "landing") return (slideTimer = setTimeout(next, 1200));
       showSlide(slide + 1);
-    }, 5600);
+    }, window.SITE.slidePace || 5600); // seconds per slide can be set in /admin
   };
 
   // Projects ------------------------------------------------------------
@@ -657,14 +657,16 @@
     intro.remove();
     if (firstRoute.name === "landing" && !firstRoute.panel) setTimeout(showWorkOnSide, 500);
   } else {
-    // Twelve frames: one from every project, then four more (the small copies
-    // load fast), cut quicker and quicker, then easing off.
-    const frames = [
-      ...PROJECTS.map((p) => p.photos[1] || p.photos[0]),
-      ...PROJECTS.slice(0, 5).map((p) => p.photos[p.photos.length - 1]),
-    ].map((ph) => thumbOf(ph.src));
-    // Same pace as the reference site (measured): a steady ~260 ms per photo.
-    const HOLD = Array(13).fill(260);
+    // The photographs chosen in /admin, else automatic: one from every project,
+    // then five more. The small copies, so they load fast.
+    const OPENING = window.OPENING || {};
+    const frames = (
+      Array.isArray(OPENING.frames) && OPENING.frames.length
+        ? OPENING.frames
+        : [...PROJECTS.map((p) => (p.photos[1] || p.photos[0]).src), ...PROJECTS.slice(0, 5).map((p) => p.photos[p.photos.length - 1].src)]
+    ).map(thumbOf);
+    // A steady pace per photograph: 260 ms (the reference site's) unless set in /admin.
+    const HOLD = Array(frames.length).fill(OPENING.pace || 260);
     const timers = [];
     let finished = false;
     const nameEl = $("intro-name");

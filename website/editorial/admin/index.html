@@ -45,6 +45,7 @@
         <a class="brand small" href="/" target="_blank" rel="noopener" title="Open the site">Sundar Rajan</a>
         <nav class="tabs" aria-label="Sections">
           <button type="button" data-tab="projects" aria-current="page">Projects</button>
+          <button type="button" data-tab="opening">Opening</button>
           <button type="button" data-tab="slideshow">Slideshow</button>
           <button type="button" data-tab="info">Info</button>
           <button type="button" data-tab="enquiries">Enquiries</button>
@@ -65,6 +66,54 @@
         </aside>
         <div id="project" class="project"></div>
       </section>
+
+      <section id="tab-opening" class="tab" hidden>
+        <div class="toolbar">
+          <p class="hint">
+            The fast cuts that open the site, before the name appears. Choose the photographs and their order, and how
+            quickly they change. Drag to reorder; drop files on this page to upload.
+          </p>
+          <div class="toolbar-actions">
+            <button type="button" id="preview-opening" class="quiet">▶ Preview</button>
+            <button type="button" id="pick-opening" class="ghost">Add from projects</button>
+            <button type="button" id="add-opening" class="primary">Upload</button>
+            <input id="opening-files" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden />
+          </div>
+        </div>
+        <div class="paces">
+          <label>
+            <span class="pace-head">Opening: each photograph <output id="opening-pace-out"></output></span>
+            <input id="opening-pace" type="range" min="100" max="1000" step="10" />
+            <small id="opening-total"></small>
+          </label>
+          <label>
+            <span class="pace-head">Slideshow: each photograph <output id="slide-pace-out"></output></span>
+            <input id="slide-pace" type="range" min="2" max="15" step="0.5" />
+            <small>The regular slideshow after the opening.</small>
+          </label>
+        </div>
+        <p class="auto-note" id="opening-auto">
+          <span></span>
+          <button type="button" id="opening-reset" class="quiet">Back to automatic</button>
+        </p>
+        <ol id="opening-frames" class="grid compact"></ol>
+      </section>
+
+      <dialog id="picker" class="frame picker" aria-labelledby="picker-title">
+        <h2 id="picker-title" class="section-title">Add to the opening</h2>
+        <p class="hint">Tap photographs to select them; they are added in the order you select them.</p>
+        <div id="picker-list" class="picker-list"></div>
+        <p class="frame-actions">
+          <button type="button" id="picker-cancel" class="quiet">Cancel</button>
+          <button type="button" id="picker-add" class="primary">Add</button>
+        </p>
+      </dialog>
+
+      <dialog id="preview" class="preview" aria-label="Preview of the opening">
+        <img id="preview-img" alt="" />
+        <p id="preview-name" class="preview-name">Sundar Rajan</p>
+        <button type="button" id="preview-close" class="quiet preview-close">Close</button>
+      </dialog>
 
       <section id="tab-slideshow" class="tab" hidden>
         <div class="toolbar">

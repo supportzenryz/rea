@@ -237,6 +237,8 @@
       instagram: window.SITE.contact.instagram ? window.SITE.contact.instagram.label.replace(/^@/, "") : "",
       based: window.SITE.contact.based || "",
     },
+    ...(window.OPENING ? { opening: structuredClone(window.OPENING) } : {}),
+    ...(window.SITE.slidePace ? { slidePace: window.SITE.slidePace } : {}),
   });
 
   const loadContent = async () => {
@@ -255,6 +257,7 @@
     document.querySelectorAll(".tab").forEach((s) => (s.hidden = s.id !== `tab-${name}`));
     if (name === "enquiries") loadEnquiries();
     if (name === "slideshow") renderSlides();
+    if (name === "opening") renderOpening();
   };
   tabs.forEach((b) => b.addEventListener("click", () => openTab(b.dataset.tab)));
 
@@ -263,6 +266,7 @@
     renderProjectList();
     renderProject();
     renderSlides();
+    renderOpening();
     renderInfo();
     renderStatus();
   };
@@ -391,6 +395,7 @@
                   p.photos.splice(i, 1);
                   if (p.cover === ph.src) delete p.cover;
                   state.landing = state.landing.filter((s) => s.src !== ph.src);
+                  dropFromOpening([ph.src]);
                   markDirty();
                   renderAll();
                 },
@@ -415,7 +420,7 @@
 
     box.replaceChildren(
       h("div", { class: "fields" }, h("label", {}, "Title", title), h("label", {}, "Address", h("span", { class: "addr" }, "/#/work/", idInput))),
-      h("p", { class: "hint" }, "Drag photographs to reorder, or drop files here to add them. ◉ makes a photograph the cover (its card in Thumbnails; the first one until you choose another). ☆ puts one in the opening slideshow."),
+      h("p", { class: "hint" }, "Drag photographs to reorder, or drop files here to add them. ◉ makes a photograph the cover (its card in Thumbnails; the first one until you choose another). ☆ puts one in the slideshow."),
       grid,
       file,
       h(
@@ -430,6 +435,7 @@
               if (state.projects.length === 1) return toast("The site needs at least one project.", true);
               if (!confirm(`Delete the project "${p.title}" and its photographs from the site?`)) return;
               state.landing = state.landing.filter((s) => !p.photos.some((ph) => ph.src === s.src));
+              dropFromOpening(p.photos.map((ph) => ph.src));
               state.projects.splice(selected, 1);
               selected = Math.max(0, selected - 1);
               markDirty();
@@ -805,6 +811,211 @@
       btn.textContent = "Apply";
     }
   });
+
+  // Opening ---------------------------------------------------------------------
+  // The fast cuts before the name. Until Sundar edits them, the site picks the
+  // photographs itself (one from every project, then five more), 260 ms each.
+
+  const OPENING_AUTO_PACE = 260;
+  const SLIDE_AUTO_PACE = 5600;
+  const autoFrames = () => [
+    ...state.projects.map((p) => (p.photos[1] || p.photos[0]).src),
+    ...state.projects.slice(0, 5).map((p) => p.photos[p.photos.length - 1].src),
+  ];
+  const isCustom = () => Array.isArray(state.opening?.frames) && state.opening.frames.length > 0;
+  const frames = () => (isCustom() ? state.opening.frames : autoFrames());
+  // The first edit turns the automatic choice into Sundar's own list.
+  const ownFrames = () => {
+    if (!isCustom()) state.opening = { ...(state.opening || {}), frames: autoFrames() };
+    return state.opening.frames;
+  };
+  const dropFromOpening = (srcs) => {
+    if (!isCustom()) return;
+    state.opening.frames = state.opening.frames.filter((f) => !srcs.includes(f));
+    if (!state.opening.frames.length) delete state.opening.frames;
+  };
+  const openingPace = () => state.opening?.pace || OPENING_AUTO_PACE;
+  const slidePace = () => state.slidePace || SLIDE_AUTO_PACE;
+  const projectOf = (src) => state.projects.find((p) => p.photos.some((ph) => ph.src === src))?.title || "";
+
+  const renderOpening = () => {
+    const list = frames();
+    $("opening-pace").value = String(openingPace());
+    $("opening-pace-out").textContent = `${(openingPace() / 1000).toFixed(2)} s`;
+    $("opening-total").textContent = `${list.length} photographs · about ${((list.length * openingPace()) / 1000).toFixed(1)} s of cuts, then the name.`;
+    $("slide-pace").value = String(slidePace() / 1000);
+    $("slide-pace-out").textContent = `${(slidePace() / 1000).toFixed(1)} s`;
+    const note = $("opening-auto");
+    note.querySelector("span").textContent = isCustom()
+      ? "Your own selection."
+      : "Automatic: one photograph from every project, then five more. Any change makes it your own.";
+    $("opening-reset").hidden = !isCustom() && !state.opening?.pace;
+
+    const grid = $("opening-frames");
+    grid.replaceChildren(
+      ...list.map((src, i) =>
+        h(
+          "li",
+          { class: "tile", draggable: "true", "data-i": i },
+          h("img", { src: thumb(src), alt: "", loading: "lazy", draggable: "false" }),
+          h("span", { class: "badge" }, `${i + 1}${projectOf(src) ? ` · ${projectOf(src)}` : ""}`),
+          h(
+            "span",
+            { class: "tools" },
+            h("button", { type: "button", class: "icon", "aria-label": "Move earlier", disabled: i === 0, onclick: () => (move(ownFrames(), i, i - 1), markDirty(), renderOpening()) }, "←"),
+            h("button", { type: "button", class: "icon", "aria-label": "Move later", disabled: i === list.length - 1, onclick: () => (move(ownFrames(), i, i + 1), markDirty(), renderOpening()) }, "→"),
+            h(
+              "button",
+              {
+                type: "button",
+                class: "icon",
+                "aria-label": "Take out of the opening",
+                onclick: () => {
+                  if (list.length <= 3) return toast("The opening needs at least 3 photographs.", true);
+                  ownFrames().splice(i, 1);
+                  markDirty();
+                  renderOpening();
+                },
+              },
+              "✕",
+            ),
+          ),
+        ),
+      ),
+    );
+    if (!grid.dataset.sortable) {
+      grid.dataset.sortable = "1";
+      dragSort(grid, { get length() { return frames().length; }, splice: (...a) => ownFrames().splice(...a) }, renderOpening);
+    }
+  };
+
+  $("opening-pace").addEventListener("input", (e) => {
+    const v = Number(e.target.value);
+    state.opening = { ...(state.opening || {}), pace: v };
+    if (v === OPENING_AUTO_PACE) delete state.opening.pace;
+    markDirty();
+    renderOpening();
+  });
+  $("slide-pace").addEventListener("input", (e) => {
+    const v = Math.round(Number(e.target.value) * 1000);
+    if (v === SLIDE_AUTO_PACE) delete state.slidePace;
+    else state.slidePace = v;
+    markDirty();
+    renderOpening();
+  });
+  $("opening-reset").addEventListener("click", () => {
+    if (!confirm("Go back to the automatic opening (photographs and pace)?")) return;
+    delete state.opening;
+    markDirty();
+    renderOpening();
+  });
+
+  // Upload straight into the opening.
+  $("add-opening").addEventListener("click", () => $("opening-files").click());
+  $("opening-files").addEventListener("change", (e) => {
+    const files = [...e.target.files];
+    e.target.value = "";
+    if (frames().length + files.length > 40) return toast("The opening can have at most 40 photographs.", true);
+    runUploads(files, "opening", (photo) => {
+      ownFrames().push(photo.src);
+      renderOpening();
+    });
+  });
+  const openingTab = $("tab-opening");
+  openingTab.addEventListener("dragover", (e) => e.dataTransfer.types.includes("Files") && (e.preventDefault(), openingTab.classList.add("drop")));
+  openingTab.addEventListener("dragleave", () => openingTab.classList.remove("drop"));
+  openingTab.addEventListener("drop", (e) => {
+    openingTab.classList.remove("drop");
+    if (!e.dataTransfer.files.length) return;
+    e.preventDefault();
+    runUploads([...e.dataTransfer.files], "opening", (photo) => {
+      ownFrames().push(photo.src);
+      renderOpening();
+    });
+  });
+
+  // Add from projects: a picker of every project photograph.
+  let picked = [];
+  $("pick-opening").addEventListener("click", () => {
+    picked = [];
+    const inOpening = new Set(frames());
+    $("picker-list").replaceChildren(
+      ...state.projects.map((p) =>
+        h(
+          "section",
+          { class: "picker-project" },
+          h("h3", {}, p.title),
+          h(
+            "div",
+            { class: "grid compact" },
+            p.photos.map((ph) => {
+              const btn = h(
+                "button",
+                { type: "button", class: `pick-tile${inOpening.has(ph.src) ? " used" : ""}`, "aria-pressed": "false", title: inOpening.has(ph.src) ? "Already in the opening" : "" },
+                h("img", { src: thumb(ph.src), alt: `${p.title}`, loading: "lazy" }),
+                h("span", { class: "pick-n" }),
+              );
+              btn.addEventListener("click", () => {
+                const at = picked.indexOf(ph.src);
+                if (at >= 0) picked.splice(at, 1);
+                else picked.push(ph.src);
+                // Show the order of selection on each picked tile.
+                document.querySelectorAll("#picker-list .pick-tile").forEach((b) => {
+                  const src = b.querySelector("img").getAttribute("src");
+                  const n = picked.findIndex((s) => thumb(s) === src);
+                  b.setAttribute("aria-pressed", String(n >= 0));
+                  b.querySelector(".pick-n").textContent = n >= 0 ? String(n + 1) : "";
+                });
+                $("picker-add").textContent = picked.length ? `Add ${picked.length}` : "Add";
+              });
+              return btn;
+            }),
+          ),
+        ),
+      ),
+    );
+    $("picker-add").textContent = "Add";
+    $("picker").showModal();
+  });
+  $("picker-cancel").addEventListener("click", () => $("picker").close());
+  $("picker-add").addEventListener("click", () => {
+    if (!picked.length) return $("picker").close();
+    if (frames().length + picked.length > 40) return toast("The opening can have at most 40 photographs.", true);
+    ownFrames().push(...picked);
+    markDirty();
+    renderOpening();
+    $("picker").close();
+    toast(`${picked.length} added to the opening. Publish to show it on the site.`);
+  });
+
+  // Preview: plays the opening as it will look, at the chosen pace.
+  let previewTimers = [];
+  const stopPreview = () => {
+    previewTimers.forEach(clearTimeout);
+    previewTimers = [];
+    $("preview").close();
+  };
+  $("preview-opening").addEventListener("click", async () => {
+    const list = frames().map(thumb);
+    const img = $("preview-img");
+    const name = $("preview-name");
+    name.classList.remove("in", "out");
+    img.removeAttribute("src");
+    $("preview").showModal();
+    // Load every photograph first, so the cuts are clean.
+    await Promise.all(list.map((src) => new Promise((r) => Object.assign(new Image(), { onload: r, onerror: r, src }))));
+    let t = 0;
+    list.forEach((src) => {
+      previewTimers.push(setTimeout(() => (img.src = src), t));
+      t += openingPace();
+    });
+    previewTimers.push(setTimeout(() => img.removeAttribute("src"), t));
+    previewTimers.push(setTimeout(() => name.classList.add("in"), t + 250));
+    previewTimers.push(setTimeout(() => name.classList.add("out"), t + 1650));
+    previewTimers.push(setTimeout(stopPreview, t + 3300));
+  });
+  $("preview-close").addEventListener("click", stopPreview);
+  $("preview").addEventListener("cancel", () => previewTimers.forEach(clearTimeout));
 
   // Info ------------------------------------------------------------------------
 
