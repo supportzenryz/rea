@@ -4,3 +4,4 @@ dev.mjs
 README.md
 .wrangler
 .assetsignore
+MIGRATION.md

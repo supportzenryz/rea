@@ -12,7 +12,7 @@ import worker from "./src/worker.js";
 const root = path.dirname(fileURLToPath(import.meta.url));
 const pub = root;
 // Same files Cloudflare leaves out (see .assetsignore): never served.
-const HIDDEN = /^\/(src|\.wrangler)(\/|$)|^\/(wrangler\.jsonc|dev\.mjs|README\.md|\.assetsignore)$/;
+const HIDDEN = /^\/(src|\.wrangler)(\/|$)|^\/(wrangler\.jsonc|dev\.mjs|README\.md|MIGRATION\.md|\.assetsignore)$/;
 const port = Number(process.argv[2]) || 4176;
 const TYPES = {
   ".html": "text/html; charset=utf-8",

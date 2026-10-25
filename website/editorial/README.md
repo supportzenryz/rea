@@ -18,8 +18,14 @@ JavaScript, plus a small Cloudflare Worker for enquiries, SEO and the /admin edi
   URLs plus structured data for whichever domain the site is on, serves
   `robots.txt` and `sitemap.xml`, sets security headers, and handles
   `POST /api/enquiry`.
-- `wrangler.jsonc`: Worker config. `.assetsignore` keeps the Worker code, the
-  config and this README out of the published files.
+- `wrangler.jsonc`: Worker config. `run_worker_first` lists the only paths that
+  run the Worker (the page, data.js, the API, /admin, robots, sitemap and
+  photographs uploaded in /admin); every other file is served directly, free
+  and unlimited. A Cloudflare Redirect Rule sends www. and http:// to
+  https://photosbysundar.com (the Worker does the same for its own paths).
+- `MIGRATION.md`: how to move everything to another Cloudflare account.
+- `.assetsignore` keeps the Worker code, the config, this README and
+  MIGRATION.md out of the published files.
 - `dev.mjs`: local preview that runs the real Worker: `node dev.mjs`.
 
 ## Deploy (Cloudflare)
