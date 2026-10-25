@@ -9,14 +9,17 @@
     "binding": "ASSETS",
     // Unknown addresses get the site's own 404 page.
     "not_found_handling": "404-page",
-    // These go through the Worker; every photo and script is served directly.
     // Every request, so www can be redirected on any path.
     "run_worker_first": true
   },
   "vars": {
-    // Where enquiries are emailed (when RESEND_API_KEY is set as a secret).
-    "ENQUIRY_TO": "work.photosbysundar@gmail.com"
+    // Where enquiries are emailed, and the address they come from.
+    "ENQUIRY_TO": "work.photosbysundar@gmail.com",
+    "MAIL_FROM": "enquiries@photosbysundar.com"
   },
+  // Cloudflare Email: sends only to ENQUIRY_TO, which must be a verified
+  // destination address in the domain's Email Routing.
+  "send_email": [{ "name": "MAILER", "destination_address": "work.photosbysundar@gmail.com" }],
   "observability": { "enabled": true }
 
   // Optional, to keep a copy of every enquiry and rate-limit senders:

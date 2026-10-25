@@ -183,7 +183,19 @@ async function enquiry(request, env, url) {
     delivered = true;
   }
 
-  if (env.RESEND_API_KEY && env.ENQUIRY_TO) {
+  // Cloudflare Email (send_email binding): needs Email Routing on the domain
+  // and ENQUIRY_TO verified as a destination address there.
+  if (env.MAILER && env.MAIL_FROM && env.ENQUIRY_TO) {
+    try {
+      const { EmailMessage } = await import("cloudflare:email");
+      await env.MAILER.send(new EmailMessage(env.MAIL_FROM, env.ENQUIRY_TO, mime(env.MAIL_FROM, env.ENQUIRY_TO, d, record)));
+      delivered = true;
+    } catch (err) {
+      console.error("Cloudflare Email refused the enquiry", err);
+    }
+  }
+
+  if (!delivered && env.RESEND_API_KEY && env.ENQUIRY_TO) {
     try {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -206,6 +218,32 @@ async function enquiry(request, env, url) {
 
   if (!delivered) return json({ ok: false, fallback: "mailto" }, 503);
   return json({ ok: true });
+}
+
+// A plain-text and HTML email as raw MIME. Everything the visitor typed is
+// base64-encoded, so it can never break out into a header.
+function mime(from, to, d, r) {
+  const b64 = (s) => {
+    let bin = "";
+    for (const byte of new TextEncoder().encode(s)) bin += String.fromCharCode(byte);
+    return btoa(bin).replace(/.{76}/g, "$&\r\n");
+  };
+  const boundary = `b${crypto.randomUUID().replace(/-/g, "")}`;
+  const part = (type, body) =>
+    `--${boundary}\r\nContent-Type: ${type}; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64(body)}\r\n`;
+  return (
+    `From: Website <${from}>\r\n` +
+    `To: ${to}\r\n` +
+    `Reply-To: ${d.email}\r\n` +
+    `Subject: =?UTF-8?B?${b64(`${d.type} enquiry — ${d.name.replace(/\s+/g, " ")}`).replace(/\r\n/g, "")}?=\r\n` +
+    `Date: ${new Date(r.receivedAt).toUTCString()}\r\n` +
+    `Message-ID: <${crypto.randomUUID()}@${from.split("@")[1]}>\r\n` +
+    `MIME-Version: 1.0\r\n` +
+    `Content-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n` +
+    part("text/plain", `${d.message}\n\n${d.name}\n${d.email}\n\nSent from the website, ${r.receivedAt}`) +
+    part("text/html", emailHtml(r)) +
+    `--${boundary}--\r\n`
+  );
 }
 
 function emailHtml(r) {
