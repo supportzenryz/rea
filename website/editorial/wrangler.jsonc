@@ -9,8 +9,22 @@
     "binding": "ASSETS",
     // Unknown addresses get the site's own 404 page.
     "not_found_handling": "404-page",
-    // Every request, so www can be redirected on any path.
-    "run_worker_first": true
+    // Only these run the Worker (they count toward the 100,000 free Worker
+    // requests a day); every other file is served directly, free and
+    // unlimited. Photographs uploaded in /admin (u-…) live in KV.
+    "run_worker_first": [
+      "/",
+      "/index.html",
+      "/data.js",
+      "/api/*",
+      "/admin",
+      "/admin/*",
+      "/robots.txt",
+      "/sitemap.xml",
+      "/photos/*/u-*",
+      "/medium/*/u-*",
+      "/thumbs/*/u-*"
+    ]
   },
   "vars": {
     // Where enquiries are emailed, and the address they come from.

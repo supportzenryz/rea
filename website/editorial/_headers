@@ -1,3 +1,10 @@
+# Every file served directly (the Worker sets its own headers on the page,
+# admin and API).
+/*
+  X-Content-Type-Options: nosniff
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Referrer-Policy: strict-origin-when-cross-origin
+
 # Photographs rarely change: let browsers keep them for 30 days (and use a
 # stale copy while re-checking for a day after that).
 /photos/*

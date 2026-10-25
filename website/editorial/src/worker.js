@@ -25,10 +25,15 @@ const BIO =
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    // One address for search engines: www.photosbysundar.com -> photosbysundar.com.
-    if (url.hostname.startsWith("www.")) {
-      url.hostname = url.hostname.slice(4);
-      return Response.redirect(url.toString(), 301);
+    // One address, always encrypted: http:// and www. go to
+    // https://photosbysundar.com (a Cloudflare Redirect Rule does the same for
+    // the files that never reach this Worker).
+    const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    if (url.hostname.startsWith("www.") || (url.protocol === "http:" && !local)) {
+      url.hostname = url.hostname.replace(/^www\./, "");
+      if (!local) url.protocol = "https:";
+      // 308 keeps a form's POST a POST.
+      return Response.redirect(url.toString(), ["GET", "HEAD"].includes(request.method) ? 301 : 308);
     }
     const p = url.pathname;
     if (p.startsWith("/admin/api/")) return adminApi(request, env, url, ctx);
