@@ -35,18 +35,22 @@ const env = {
       let p = decodeURIComponent(new URL(request.url).pathname);
       if (HIDDEN.test(p)) return new Response("Not found", { status: 404 });
       if (p.endsWith("/")) p += "index.html";
-      const file = path.join(pub, p);
-      if (!file.startsWith(pub)) return new Response("Forbidden", { status: 403 });
-      try {
-        const data = await fs.readFile(file);
-        return new Response(data, { headers: { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream" } });
-      } catch {
-        return new Response("Not found", { status: 404 });
+      // Like Cloudflare: /privacy serves privacy.html; a missing file gets 404.html.
+      for (const candidate of [p, `${p}.html`]) {
+        const file = path.join(pub, candidate);
+        if (!file.startsWith(pub)) return new Response("Forbidden", { status: 403 });
+        try {
+          const data = await fs.readFile(file);
+          return new Response(data, { headers: { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream" } });
+        } catch {}
       }
+      return new Response(await fs.readFile(path.join(pub, "404.html")), { status: 404, headers: { "Content-Type": TYPES[".html"] } });
     },
   },
   // The admin's password here comes from the environment: ADMIN_PASSWORD=... node dev.mjs
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+  // GA_ID=G-… node dev.mjs shows the cookie banner locally.
+  GA_ID: process.env.GA_ID,
   // Emails (enquiries, password links) are printed here instead of sent.
   RESEND_API_KEY: "local",
   CONTENT: process.env.NO_KV ? undefined : memoryKV(store),

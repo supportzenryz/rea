@@ -13,14 +13,12 @@
 
 import { adminApi } from "./admin.js";
 import { dataScript, getImage, loadContent } from "./content.js";
+import { headFor, pageFor, siteContent, sitemapFor } from "./pages.js";
 import { escapeHtml, sendMail } from "./mail.js";
 
 const MAX_BODY = 12_000;
 const TYPES = ["Commission", "Editorial", "Collaboration", "Other"];
 const RATE_LIMIT = { max: 5, windowSeconds: 3600, perDay: 200 };
-
-const BIO =
-  "Sundar Rajan is a fashion photographer working between India and Europe. His work explores the relationship between fashion and the human experience, using clothing as a means of expressing identity, emotion and the complexities of being human.";
 
 export default {
   async fetch(request, env, ctx) {
@@ -50,11 +48,10 @@ export default {
       case "/robots.txt":
         return plain(`User-agent: *\nAllow: /\nDisallow: /admin/\n\nSitemap: ${url.origin}/sitemap.xml\n`, "text/plain");
       case "/sitemap.xml":
-        return plain(sitemap(url.origin), "application/xml");
-      case "/":
-      case "/index.html":
-        return page(request, env, url);
+        return plain(sitemapFor(url.origin, await siteContent(env, url)), "application/xml");
       default:
+        // The site's own pages (/, /work/…, /info …); everything else is a file.
+        if (/^\/(index\.html|work\/.+|thumbnails(\/.*)?|index|info|contact)?$/.test(p)) return page(request, env, url);
         return env.ASSETS.fetch(request);
     }
   },
@@ -92,11 +89,12 @@ async function adminAsset(request, env) {
 const SECURITY_HEADERS = {
   "Content-Security-Policy": [
     "default-src 'self'",
-    "img-src 'self' data:",
+    // Google Analytics hosts, from Google's CSP guide (consent.js loads the tag).
+    "img-src 'self' data: https://*.google-analytics.com https://*.googletagmanager.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src https://fonts.gstatic.com",
-    "script-src 'self'",
-    "connect-src 'self'",
+    "script-src 'self' https://www.googletagmanager.com",
+    "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
     "form-action 'self' mailto:",
     "base-uri 'self'",
     "object-src 'none'",
@@ -114,8 +112,21 @@ async function page(request, env, url) {
   }
   const asset = await env.ASSETS.fetch(new Request(new URL("/", url), request));
   if (!asset.ok) return asset;
-  const content = await loadContent(env);
-  let html = (await asset.text()).replace("<!--seo-->", seoTags(url.origin, content));
+  const content = await siteContent(env, url);
+  const pg = pageFor(url.pathname, content);
+  if (!pg) {
+    // No such page: the site's 404 page, with a real 404 status.
+    const nf = await env.ASSETS.fetch(new Request(new URL("/404.html", url)));
+    const h = new Headers(nf.headers);
+    for (const [k, v] of Object.entries(SECURITY_HEADERS)) h.set(k, v);
+    return new Response(request.method === "HEAD" ? null : nf.body, { status: 404, headers: h });
+  }
+  let html = headFor(await asset.text(), pg, url.origin, content);
+  // Google Analytics: the measurement ID for consent.js, which starts Google's
+  // tag with every kind of storage denied until the visitor accepts.
+  if (env.GA_ID && /^G-[A-Z0-9]{4,15}$/.test(env.GA_ID)) {
+    html = html.replace("</head>", `  <meta name="ga-id" content="${env.GA_ID}" />\n  </head>`);
+  }
   // The first slide is preloaded; follow the slideshow saved in /admin.
   const first = content?.landing?.[0]?.src;
   if (first) {
@@ -132,52 +143,6 @@ async function page(request, env, url) {
   headers.delete("ETag");
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) headers.set(k, v);
   return new Response(request.method === "HEAD" ? null : html, { status: 200, headers });
-}
-
-function seoTags(origin, content) {
-  const home = `${origin}/`;
-  const image = `${origin}/${content?.landing?.[0]?.src || "photos/landing/01.jpg"}`;
-  const email = content?.contact?.email || "work.photosbysundar@gmail.com";
-  const instagram = content ? content.contact.instagram : "photosbysundar";
-  const data = [
-    {
-      "@context": "https://schema.org",
-      "@type": "Person",
-      name: "Sundar Rajan",
-      jobTitle: "Fashion Photographer",
-      description: content?.bio?.[0] || BIO,
-      url: home,
-      image,
-      email: `mailto:${email}`,
-      sameAs: instagram ? [`https://www.instagram.com/${instagram}/`] : [],
-      workLocation: [
-        { "@type": "Place", name: "India" },
-        { "@type": "Place", name: "Europe" },
-      ],
-      knowsAbout: ["Fashion photography", "Editorial photography", "Portrait photography"],
-    },
-    { "@context": "https://schema.org", "@type": "WebSite", name: "Sundar Rajan", url: home },
-  ];
-  // "<" is escaped so the JSON can never close the script element early.
-  const json = JSON.stringify(data).replace(/</g, "\\u003c");
-  return [
-    `<link rel="canonical" href="${home}" />`,
-    `<meta property="og:url" content="${home}" />`,
-    `<meta property="og:image" content="${image}" />`,
-    `<meta name="twitter:image" content="${image}" />`,
-    `<script type="application/ld+json">${json}</script>`,
-  ].join("\n    ");
-}
-
-function sitemap(origin) {
-  const today = new Date().toISOString().slice(0, 10);
-  return (
-    `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n` +
-    `  <url>\n    <loc>${origin}/</loc>\n    <lastmod>${today}</lastmod>\n` +
-    `    <image:image><image:loc>${origin}/photos/landing/01.jpg</image:loc></image:image>\n  </url>\n` +
-    `</urlset>\n`
-  );
 }
 
 // Enquiries -------------------------------------------------------------

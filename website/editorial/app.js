@@ -1,5 +1,6 @@
-// Routes: #/ (slideshow), #/work/<project>/<n>, #/thumbnails,
-// #/index, #/info and #/contact (slideshow with the panel open on that tab).
+// Routes (real addresses, History API): / (slideshow), /work/<project>/<n>,
+// /thumbnails, /thumbnails/<project>, and /index, /info, /contact (slideshow
+// with the panel open on that tab). Old #/… links are converted on arrival.
 //
 // Smoothness rules this file follows:
 // - Only one photograph is ever on screen. A change waits for the next
@@ -40,7 +41,8 @@
 
   const esc = (s) =>
     String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-  const thumbOf = (src) => src.replace(/^photos\//, "thumbs/");
+  const abs = (src) => src.replace(/^\/?/, "/");
+  const thumbOf = (src) => abs(src.replace(/^\/?photos\//, "thumbs/"));
   // A project's cover (chosen in /admin), else its first photograph.
   const coverOf = (p) => p.photos.find((ph) => ph.src === p.cover) || p.photos[0];
   const isOpen = () => body.classList.contains("panel-open");
@@ -52,10 +54,11 @@
   // full files. index.html preloads the first slide with the same rule.
   // Browsers that show WebP (decided in boot.js before first render) get the
   // .webp beside each .jpg, about half the size; others keep the JPEG.
+  // Every file address starts with "/", so it works from any page address.
   let webpOK = false;
   const sized = (src) => {
-    const s = innerWidth <= 1024 ? src.replace(/^photos\//, "medium/") : src;
-    return webpOK ? s.replace(/\.jpg$/, ".webp") : s;
+    const s = innerWidth <= 1024 ? src.replace(/^\/?photos\//, "medium/") : src;
+    return abs(webpOK ? s.replace(/\.jpg$/, ".webp") : s);
   };
 
   const cache = new Map();
@@ -139,7 +142,7 @@
   // Panel ---------------------------------------------------------------
 
   worksEl.innerHTML = PROJECTS.map(
-    (p) => `<li><a href="#/work/${p.id}/1" data-id="${p.id}"><span class="title">${esc(p.title)}</span></a></li>`,
+    (p) => `<li><a href="/work/${p.id}/1" data-id="${p.id}"><span class="title">${esc(p.title)}</span></a></li>`,
   ).join("");
 
   infoEl.innerHTML =
@@ -150,7 +153,8 @@
       ? `<dt>Instagram</dt><dd><a href="${esc(CONTACT.instagram.href)}" target="_blank" rel="noopener">${esc(CONTACT.instagram.label)}</a></dd>`
       : "") +
     (CONTACT.based ? `<dt>Based</dt><dd>${esc(CONTACT.based)}</dd>` : "") +
-    `</dl>`;
+    `</dl>` +
+    `<p class="small-print"><a href="/privacy">Privacy &amp; cookies</a></p>`;
 
   const warmCovers = () => PROJECTS.forEach((p) => prepare(coverOf(p).src));
 
@@ -219,11 +223,11 @@
     document.querySelector('[data-view="thumbnails"]').classList.toggle("is-active", route().name === "thumbnails");
   };
 
-  let lastStageHash = "#/";
+  let lastStageHash = "/";
   document.querySelector('[data-view="index"]').addEventListener("click", (e) => {
     e.preventDefault();
     if (route().name === "thumbnails") {
-      location.hash = lastStageHash;
+      go(lastStageHash);
       setTimeout(() => openPanel("works"), 140);
     } else if (isOpen()) closePanel();
     else openPanel("works");
@@ -237,23 +241,23 @@
     e.preventDefault();
     const r = route();
     thumbsFromProject = r.name === "project";
-    location.hash = thumbsFromProject ? `#/thumbnails/${r.p.id}` : "#/thumbnails";
+    go(thumbsFromProject ? `/thumbnails/${r.p.id}` : "/thumbnails");
   });
 
   // Back: up one level.
   let cameFrom = "home";
-  let thumbsReturn = "#/thumbnails";
+  let thumbsReturn = "/thumbnails";
   backEl.addEventListener("click", (e) => {
     e.preventDefault();
     const r = route();
     if (r.name === "thumbnails" && r.scope && thumbsFromProject) {
       thumbsFromProject = false;
-      location.hash = lastStageHash; // that project's photos -> the photo you were on
-    } else if (r.name === "thumbnails" && r.scope) location.hash = "#/thumbnails"; // photos -> project cards
-    else if (r.name === "thumbnails") location.hash = lastStageHash; // cards -> where you were
-    else if (cameFrom === "thumbs") location.hash = thumbsReturn; // one photo -> its project's photos
+      go(lastStageHash); // that project's photos -> the photo you were on
+    } else if (r.name === "thumbnails" && r.scope) go("/thumbnails"); // photos -> project cards
+    else if (r.name === "thumbnails") go(lastStageHash); // cards -> where you were
+    else if (cameFrom === "thumbs") go(thumbsReturn); // one photo -> its project's photos
     else {
-      location.hash = "#/";
+      go("/");
       if (cameFrom === "index") setTimeout(() => openPanel("works"), 140);
     }
   });
@@ -290,10 +294,10 @@
   const projectHref = (p, n) => {
     if (n < 1) {
       const prev = PROJECTS[(PROJECTS.indexOf(p) - 1 + PROJECTS.length) % PROJECTS.length];
-      return `#/work/${prev.id}/${prev.photos.length}`;
+      return `/work/${prev.id}/${prev.photos.length}`;
     }
-    if (n > p.photos.length) return `#/work/${PROJECTS[(PROJECTS.indexOf(p) + 1) % PROJECTS.length].id}/1`;
-    return `#/work/${p.id}/${n}`;
+    if (n > p.photos.length) return `/work/${PROJECTS[(PROJECTS.indexOf(p) + 1) % PROJECTS.length].id}/1`;
+    return `/work/${p.id}/${n}`;
   };
 
   const showProject = (p, n) => {
@@ -335,7 +339,7 @@
   zoneNext.setAttribute("aria-label", "Next photograph");
 
   const step = (d) => {
-    if (viewing) location.hash = projectHref(viewing.p, viewing.n + d);
+    if (viewing) go(projectHref(viewing.p, viewing.n + d));
     else showSlide(slide + d);
   };
   const onStep = (d) => (e) => {
@@ -408,13 +412,13 @@
         byId[scope].photos
           .map(
             (ph, i) =>
-              `<a class="thumb" href="#/work/${scope}/${i + 1}" data-cursor="${esc(byId[scope].title)}">${pic(ph.src, byId[scope].title)}</a>`,
+              `<a class="thumb" href="/work/${scope}/${i + 1}" data-cursor="${esc(byId[scope].title)}">${pic(ph.src, byId[scope].title)}</a>`,
           )
           .join("")
       : // Every project: one card each, its cover (the name shows on hover).
         PROJECTS.map(
           (p) =>
-            `<a class="thumb card" href="#/thumbnails/${p.id}" data-cursor="${esc(p.title)}" aria-label="${esc(p.title)}">` +
+            `<a class="thumb card" href="/thumbnails/${p.id}" data-cursor="${esc(p.title)}" aria-label="${esc(p.title)}">` +
             `${pic(coverOf(p).src, p.title)}</a>`,
         ).join("");
     thumbsEl.scrollTop = 0;
@@ -424,7 +428,7 @@
   thumbsEl.addEventListener("click", (e) => {
     if (!e.target.closest(".thumb:not(.card)")) return; // a photograph, not a project card
     cameFrom = "thumbs";
-    thumbsReturn = location.hash;
+    thumbsReturn = location.pathname;
   });
 
   // Crossfade between the stage and the thumbnails instead of cutting.
@@ -507,8 +511,26 @@
 
   // Router --------------------------------------------------------------
 
+  // Old links (#/work/cold/2) become real addresses (/work/cold/2).
+  if (/^#\//.test(location.hash)) history.replaceState(null, "", location.hash.slice(1) + location.search);
+
+  // Moves to an address inside the site without reloading the page.
+  const go = (path) => {
+    if (path !== location.pathname) history.pushState(null, "", path);
+    render();
+  };
+  // Links inside the site stay inside it (new-tab and modified clicks are left alone).
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest && e.target.closest('a[href^="/"]');
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || a.target) return;
+    // Only the slideshow's own pages; others (e.g. /privacy) load normally.
+    if (!/^\/(work\/|thumbnails|index$|info$|contact$|$)/.test(a.getAttribute("href"))) return;
+    e.preventDefault();
+    go(a.getAttribute("href"));
+  });
+
   const route = () => {
-    const [a, b, c] = location.hash.replace(/^#\/?/, "").split("/");
+    const [a, b, c] = location.pathname.replace(/^\/+/, "").split("/");
     if (a === "work" && byId[b]) return { name: "project", p: byId[b], n: parseInt(c, 10) || 1 };
     if (a === "thumbnails") return { name: "thumbnails", scope: byId[b] ? b : "" };
     const panel = { index: "works", info: "info", contact: "contact" }[a] || null;
@@ -533,7 +555,7 @@
       touchName.textContent = "";
       document.title = r.scope ? `${byId[r.scope].title} — Thumbnails — Sundar Rajan` : "Thumbnails — Sundar Rajan";
     } else {
-      if (cameFrom !== "thumbs") lastStageHash = location.hash || "#/";
+      if (cameFrom !== "thumbs") lastStageHash = location.pathname || "/";
       if (r.name === "project") showProject(r.p, r.n);
       else {
         viewing = null;
@@ -547,14 +569,14 @@
     refreshCursor();
   };
 
-  window.addEventListener("hashchange", render);
+  window.addEventListener("popstate", render); // the browser's back and forward
 
   document.addEventListener("keydown", (e) => {
     if (e.target.closest && e.target.closest("input, textarea, select")) return;
     if (e.key === "Escape") {
       if (isOpen()) closePanel();
       else if (route().name === "project") backEl.click();
-      else if (route().name !== "landing") location.hash = "#/";
+      else if (route().name !== "landing") go("/");
       return;
     }
     if (stageEl.hidden || isOpen()) return;

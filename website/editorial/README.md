@@ -3,12 +3,32 @@
 A minimal portfolio where the photographs carry the site: static HTML, CSS and
 JavaScript, plus a small Cloudflare Worker for enquiries, SEO and the /admin editor.
 
-| Route                  | Page                                                     |
-| ---------------------- | -------------------------------------------------------- |
-| `#/`                   | Landing slideshow                                        |
-| `#/work/<project>/<n>` | One project, one photograph at a time (arrows, swipe, Back) |
-| `#/thumbnails`         | Every photograph, centred in an even grid                |
-| `#/index`, `#/info`, `#/contact` | Slideshow with the panel open on that tab      |
+| Address                 | Page                                                          |
+| ----------------------- | ------------------------------------------------------------- |
+| `/`                     | Opening, then the slideshow                                   |
+| `/work/<project>/<n>`   | One project, one photograph at a time (arrows, swipe, Back)  |
+| `/thumbnails[/<project>]` | Project cards, or one project's photographs                 |
+| `/index`, `/info`, `/contact` | Slideshow with the panel open on that tab               |
+| `/privacy`              | Privacy & cookies                                             |
+
+Real addresses (History API); old `#/…` links are converted on arrival.
+
+## SEO
+
+Each address is served by the Worker (`src/pages.js`) with its own title,
+description, canonical address, sharing image and structured data (Person,
+WebSite; for a project ImageGallery and BreadcrumbList). `/work/<p>/<n>`
+is canonical to `/work/<p>`; Index and Thumbnails views are `noindex,
+follow`; unknown addresses return a real 404. `/sitemap.xml` lists every
+indexable page with its photographs (image sitemap).
+
+## Analytics and cookies
+
+`consent.js` runs Google Analytics 4 with Google Consent Mode v2 once the
+Worker has the measurement ID (var `GA_ID` in `wrangler.jsonc`): every kind
+of storage starts denied; the banner's Accept grants analytics only (ads stay
+denied), Decline keeps it all off. The choice is kept in the browser
+(`sr-consent`); `/privacy` explains it and lets visitors change it.
 
 ## Files
 
