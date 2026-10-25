@@ -16,9 +16,22 @@
     <main id="signin" class="signin" hidden>
       <h1 class="brand">Sundar Rajan</h1>
       <form id="signin-form" class="signin-form">
-        <label>Password<input id="password" type="password" autocomplete="current-password" required /></label>
+        <label>Password<input id="password" type="password" autocomplete="current-password" maxlength="128" required /></label>
         <button type="submit" class="primary">Sign in</button>
+        <button type="button" id="forgot" class="quiet">Forgot password?</button>
         <p id="signin-msg" class="msg" role="alert"></p>
+      </form>
+    </main>
+
+    <!-- Opened from the emailed link (/admin/#reset=…). -->
+    <main id="reset" class="signin" hidden>
+      <h1 class="brand">Sundar Rajan</h1>
+      <form id="reset-form" class="signin-form">
+        <p class="lede">Choose a new password: at least 12 characters. A short sentence is easy to remember.</p>
+        <label>New password<input id="reset-pass" type="password" autocomplete="new-password" minlength="12" maxlength="128" required /></label>
+        <label>Same again<input id="reset-pass2" type="password" autocomplete="new-password" minlength="12" maxlength="128" required /></label>
+        <button type="submit" class="primary">Save and sign in</button>
+        <p id="reset-msg" class="msg" role="alert"></p>
       </form>
     </main>
 
@@ -35,6 +48,7 @@
           <button type="button" data-tab="slideshow">Slideshow</button>
           <button type="button" data-tab="info">Info</button>
           <button type="button" data-tab="enquiries">Enquiries</button>
+          <button type="button" data-tab="account">Account</button>
         </nav>
         <div class="actions">
           <span id="status" class="status" aria-live="polite"></span>
@@ -67,6 +81,23 @@
       <section id="tab-enquiries" class="tab" hidden>
         <p class="hint">Every message sent from the contact form, newest first.</p>
         <ol id="enquiries" class="enquiries"></ol>
+      </section>
+
+      <section id="tab-account" class="tab info" hidden>
+        <form id="password-form" class="info">
+          <h2 class="section-title">Change password</h2>
+          <p class="hint">At least 12 characters. Changing it signs out every other device and emails you a notice.</p>
+          <label>Current password<input id="pw-current" type="password" autocomplete="current-password" maxlength="128" required /></label>
+          <label>New password<input id="pw-new" type="password" autocomplete="new-password" minlength="12" maxlength="128" required /></label>
+          <label>Same again<input id="pw-new2" type="password" autocomplete="new-password" minlength="12" maxlength="128" required /></label>
+          <p><button type="submit" class="primary">Change password</button></p>
+          <p id="pw-msg" class="msg" role="alert"></p>
+        </form>
+        <div>
+          <h2 class="section-title">Devices</h2>
+          <p class="hint">Signed in somewhere you shouldn't be, or lost a device? This signs out everywhere, including here.</p>
+          <button type="button" id="signout-all" class="quiet danger">Sign out everywhere</button>
+        </div>
       </section>
     </div>
 

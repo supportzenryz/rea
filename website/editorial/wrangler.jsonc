@@ -15,7 +15,9 @@
   "vars": {
     // Where enquiries are emailed, and the address they come from.
     "ENQUIRY_TO": "work.photosbysundar@gmail.com",
-    "MAIL_FROM": "enquiries@photosbysundar.com"
+    "MAIL_FROM": "enquiries@photosbysundar.com",
+    // The address used in emailed sign-in links (never taken from a request).
+    "SITE_URL": "https://photosbysundar.com"
   },
   // Cloudflare Email: sends only to ENQUIRY_TO, which must be a verified
   // destination address in the domain's Email Routing.

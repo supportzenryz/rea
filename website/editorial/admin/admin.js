@@ -88,12 +88,38 @@
   const showSignin = (msg = "") => {
     $("app").hidden = true;
     $("setup").hidden = true;
+    $("reset").hidden = true;
     $("signin").hidden = false;
     $("signin-msg").textContent = msg;
+    $("signin-msg").classList.remove("ok");
     $("password").focus();
   };
 
+  // The emailed link opens /admin/#reset=<token>. The token is taken out of
+  // the address at once, so it does not stay in history or get copied.
+  let resetToken = null;
+  const takeResetToken = () => {
+    const m = location.hash.match(/^#reset=([A-Za-z0-9_-]{43})$/);
+    if (!m) return false;
+    resetToken = m[1];
+    history.replaceState(null, "", location.pathname);
+    return true;
+  };
+  takeResetToken();
+  // The link opened in a tab that already had the admin open.
+  addEventListener("hashchange", () => {
+    if (!takeResetToken()) return;
+    ["app", "signin", "setup"].forEach((id) => ($(id).hidden = true));
+    $("reset").hidden = false;
+    $("reset-pass").focus();
+  });
+
   const start = async () => {
+    if (resetToken) {
+      $("reset").hidden = false;
+      $("reset-pass").focus();
+      return;
+    }
     try {
       await api("session");
       await loadContent();
@@ -123,6 +149,75 @@
     } finally {
       btn.disabled = false;
     }
+  });
+
+  $("forgot").addEventListener("click", async (e) => {
+    e.target.disabled = true;
+    try {
+      const { message } = await api("forgot", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      $("signin-msg").textContent = message;
+      $("signin-msg").classList.add("ok");
+    } catch (err) {
+      $("signin-msg").textContent = err.message;
+    } finally {
+      setTimeout(() => (e.target.disabled = false), 30000); // no rapid repeats
+    }
+  });
+
+  const sameTwice = (a, b, msg) => {
+    if ($(a).value !== $(b).value) {
+      $(msg).textContent = "The two passwords are not the same.";
+      return false;
+    }
+    return true;
+  };
+
+  $("reset-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!sameTwice("reset-pass", "reset-pass2", "reset-msg")) return;
+    const btn = e.target.querySelector("button");
+    btn.disabled = true;
+    try {
+      await api("reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: resetToken, password: $("reset-pass").value }) });
+      resetToken = null;
+      e.target.reset();
+      $("reset").hidden = true;
+      await loadContent();
+      toast("New password saved. Every other device has been signed out.");
+    } catch (err) {
+      $("reset-msg").textContent = err.message;
+      if (err.body?.expired) {
+        resetToken = null;
+        setTimeout(() => showSignin("That link has expired. Ask for a new one with “Forgot password?”."), 2500);
+      }
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $("password-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("pw-msg").textContent = "";
+    if (!sameTwice("pw-new", "pw-new2", "pw-msg")) return;
+    const btn = e.target.querySelector("button");
+    btn.disabled = true;
+    try {
+      await api("password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ current: $("pw-current").value, next: $("pw-new").value }) });
+      e.target.reset();
+      toast("Password changed. Every other device has been signed out.");
+    } catch (err) {
+      $("pw-msg").textContent = err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $("signout-all").addEventListener("click", async () => {
+    if (!confirm("Sign out on every device, including this one?")) return;
+    await api("signout-everywhere", { method: "POST" }).catch(() => {});
+    dirty = false;
+    state = null;
+    showSignin("Signed out everywhere.");
   });
 
   $("signout").addEventListener("click", async () => {

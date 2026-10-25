@@ -47,7 +47,19 @@ const env = {
   },
   // The admin's password here comes from the environment: ADMIN_PASSWORD=... node dev.mjs
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+  // Emails (enquiries, password links) are printed here instead of sent.
+  RESEND_API_KEY: "local",
   CONTENT: process.env.NO_KV ? undefined : memoryKV(store),
+};
+
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (input, init) => {
+  if (String(input).startsWith("https://api.resend.com/")) {
+    const m = JSON.parse(init.body);
+    console.log(`\n--- Email to ${m.to} ---\nSubject: ${m.subject}\n${m.text}\n---\n`);
+    return new Response("{}", { status: 200 });
+  }
+  return realFetch(input, init);
 };
 
 // Enough of Workers KV for local use (kept in memory until the process ends).

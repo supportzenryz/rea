@@ -122,3 +122,11 @@ input:focus, textarea:focus { border-color: var(--ink); outline: none; }
   .fields { grid-template-columns: 1fr; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
 }
+
+/* Account and reset ------------------------------------------------------ */
+
+.section-title { margin: 0; font-family: var(--serif); font-weight: 400; font-size: 24px; }
+#tab-account { gap: 40px; }
+.msg.ok { color: var(--ink); }
+.signin-form .quiet { justify-self: center; }
+.signin-form .lede { margin: 0; text-align: left; }

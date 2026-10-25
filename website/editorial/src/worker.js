@@ -13,10 +13,11 @@
 
 import { adminApi } from "./admin.js";
 import { dataScript, getImage, loadContent } from "./content.js";
+import { escapeHtml, sendMail } from "./mail.js";
 
 const MAX_BODY = 12_000;
 const TYPES = ["Commission", "Editorial", "Collaboration", "Other"];
-const RATE_LIMIT = { max: 5, windowSeconds: 3600 };
+const RATE_LIMIT = { max: 5, windowSeconds: 3600, perDay: 200 };
 
 const BIO =
   "Sundar Rajan is a fashion photographer working between India and Europe. His work explores the relationship between fashion and the human experience, using clothing as a means of expressing identity, emotion and the complexities of being human.";
@@ -75,6 +76,9 @@ async function adminAsset(request, env) {
   );
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Referrer-Policy", "no-referrer");
+  headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  headers.set("Cross-Origin-Opener-Policy", "same-origin");
   return new Response(asset.body, { status: asset.status, headers });
 }
 
@@ -211,16 +215,20 @@ async function enquiry(request, env, url) {
   if (d.message.length < 10) missing.push("a short message");
   if (missing.length) return json({ ok: false, error: `Please add ${missing.join(", ")}.` }, 400);
 
-  // Rate limit per visitor, and a copy of every enquiry (shown in /admin).
+  // Rate limits: per visitor, and for everyone together per day (so a flood
+  // cannot fill the storage). A copy of every enquiry is kept (shown in /admin).
   const store = env.ENQUIRIES || env.CONTENT;
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   if (store) {
-    const key = `rate:${ip}`;
-    const count = Number(await store.get(key)) || 0;
-    if (count >= RATE_LIMIT.max) {
+    const day = new Date().toISOString().slice(0, 10);
+    const [mine, all] = await Promise.all([store.get(`rate:${ip}`), store.get(`rate:all:${day}`)]);
+    if ((Number(mine) || 0) >= RATE_LIMIT.max || (Number(all) || 0) >= RATE_LIMIT.perDay) {
       return json({ ok: false, error: "Too many messages for now. Please try again later." }, 429);
     }
-    await store.put(key, String(count + 1), { expirationTtl: RATE_LIMIT.windowSeconds });
+    await Promise.all([
+      store.put(`rate:${ip}`, String((Number(mine) || 0) + 1), { expirationTtl: RATE_LIMIT.windowSeconds }),
+      store.put(`rate:all:${day}`, String((Number(all) || 0) + 1), { expirationTtl: 2 * 86400 }),
+    ]);
   }
 
   const record = { ...d, receivedAt: new Date().toISOString(), country: request.cf?.country || null };
@@ -233,71 +241,25 @@ async function enquiry(request, env, url) {
     delivered = true;
   }
 
-  // Cloudflare Email (send_email binding): needs Email Routing on the domain
-  // and ENQUIRY_TO verified as a destination address there.
-  if (env.MAILER && env.MAIL_FROM && env.ENQUIRY_TO) {
-    try {
-      const { EmailMessage } = await import("cloudflare:email");
-      await env.MAILER.send(new EmailMessage(env.MAIL_FROM, env.ENQUIRY_TO, mime(env.MAIL_FROM, env.ENQUIRY_TO, d, record)));
-      delivered = true;
-    } catch (err) {
-      console.error("Cloudflare Email refused the enquiry:", err?.message || String(err));
-    }
-  }
+  const sent = await sendMail(env, {
+    subject: `${d.type} enquiry — ${d.name}`,
+    text: `${d.message}
 
-  if (!delivered && env.RESEND_API_KEY && env.ENQUIRY_TO) {
-    try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: env.ENQUIRY_FROM || "Website <onboarding@resend.dev>",
-          to: [env.ENQUIRY_TO],
-          reply_to: d.email,
-          subject: `${d.type} enquiry — ${d.name}`,
-          text: `${d.message}\n\n${d.name}\n${d.email}\n\nSent from the website, ${record.receivedAt}`,
-          html: emailHtml(record),
-        }),
-      });
-      if (res.ok) delivered = true;
-      else console.error("Resend refused the enquiry", res.status, await res.text());
-    } catch (err) {
-      console.error("Could not reach Resend", err);
-    }
-  }
+${d.name}
+${d.email}
+
+Sent from the website, ${record.receivedAt}`,
+    html: emailHtml(record),
+    replyTo: d.email,
+  });
+  if (sent) delivered = true;
 
   if (!delivered) return json({ ok: false, fallback: "mailto" }, 503);
   return json({ ok: true });
 }
 
-// A plain-text and HTML email as raw MIME. Everything the visitor typed is
-// base64-encoded, so it can never break out into a header.
-function mime(from, to, d, r) {
-  const b64 = (s) => {
-    let bin = "";
-    for (const byte of new TextEncoder().encode(s)) bin += String.fromCharCode(byte);
-    return btoa(bin).replace(/.{76}/g, "$&\r\n");
-  };
-  const boundary = `b${crypto.randomUUID().replace(/-/g, "")}`;
-  const part = (type, body) =>
-    `--${boundary}\r\nContent-Type: ${type}; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64(body)}\r\n`;
-  return (
-    `From: Website <${from}>\r\n` +
-    `To: ${to}\r\n` +
-    `Reply-To: ${d.email}\r\n` +
-    `Subject: =?UTF-8?B?${b64(`${d.type} enquiry — ${d.name.replace(/\s+/g, " ")}`).replace(/\r\n/g, "")}?=\r\n` +
-    `Date: ${new Date(r.receivedAt).toUTCString()}\r\n` +
-    `Message-ID: <${crypto.randomUUID()}@${from.split("@")[1]}>\r\n` +
-    `MIME-Version: 1.0\r\n` +
-    `Content-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n` +
-    part("text/plain", `${d.message}\n\n${d.name}\n${d.email}\n\nSent from the website, ${r.receivedAt}`) +
-    part("text/html", emailHtml(r)) +
-    `--${boundary}--\r\n`
-  );
-}
-
 function emailHtml(r) {
-  const e = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const e = escapeHtml;
   return (
     `<div style="font-family:Georgia,serif;font-size:16px;line-height:1.5;color:#1a1a1a">` +
     `<p style="color:#888;margin:0 0 16px">${e(r.type)} enquiry from the website</p>` +
