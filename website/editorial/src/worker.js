@@ -19,6 +19,11 @@ const BIO =
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    // One address for search engines: www.photosbysundar.com -> photosbysundar.com.
+    if (url.hostname.startsWith("www.")) {
+      url.hostname = url.hostname.slice(4);
+      return Response.redirect(url.toString(), 301);
+    }
     switch (url.pathname) {
       case "/api/enquiry":
         return enquiry(request, env, url);

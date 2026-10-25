@@ -10,7 +10,8 @@
     // Unknown addresses get the site's own 404 page.
     "not_found_handling": "404-page",
     // These go through the Worker; every photo and script is served directly.
-    "run_worker_first": ["/", "/index.html", "/api/*", "/robots.txt", "/sitemap.xml"]
+    // Every request, so www can be redirected on any path.
+    "run_worker_first": true
   },
   "vars": {
     // Where enquiries are emailed (when RESEND_API_KEY is set as a secret).
