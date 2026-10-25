@@ -56,9 +56,11 @@ export function mime({ from, to, subject, text, html, replyTo }) {
   const part = (type, body) =>
     `--${boundary}\r\nContent-Type: ${type}; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64(body)}\r\n`;
   return (
-    `From: Website <${from}>\r\n` +
+    `From: Sundar Rajan Website <${from}>\r\n` +
     `To: ${to}\r\n` +
     (replyTo ? `Reply-To: ${replyTo}\r\n` : "") +
+    // RFC 3834: an automatic notification, so mail systems never auto-reply to it.
+    `Auto-Submitted: auto-generated\r\n` +
     `Subject: =?UTF-8?B?${b64(subject.replace(/\s+/g, " ")).replace(/\r\n/g, "")}?=\r\n` +
     `Date: ${new Date().toUTCString()}\r\n` +
     `Message-ID: <${crypto.randomUUID()}@${from.split("@")[1]}>\r\n` +

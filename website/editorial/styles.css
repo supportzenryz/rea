@@ -479,7 +479,10 @@ body.panel-open .panel {
 
 .enquiry button[type="submit"] {
   justify-self: start;
-  margin-top: 6px;
+  /* Looks like underlined text, but is a full 44px touch target. */
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 16px 0 0;
   font-size: 16px;
   text-decoration: underline;
   text-decoration-thickness: 1px;
